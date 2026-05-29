@@ -1,0 +1,6 @@
+@Com.Application.Domain.ReadAPI_HostAddress = http://localhost:5234
+
+GET {{Com.Application.Domain.ReadAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
