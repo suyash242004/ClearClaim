@@ -22,7 +22,7 @@
 ## 📖 Table of Contents
 1. [Project Overview](#-project-overview)
 2. [9-Layer Clean Architecture](#-9-layer-clean-architecture)
-3. [Database Schema](#-database-schema)
+3. [Domain Entities & Database Schema](#-domain-entities--database-schema)
 4. [Key Features](#-key-features)
 5. [Tech Stack](#-tech-stack)
 6. [Installation & Setup](#-installation--setup)
@@ -58,8 +58,8 @@ This project is engineered using a highly modular **9-Layer Clean Architecture**
 
 ---
 
-## 🗄 Database Schema
-The database is fully normalized and leverages **PostgreSQL Database Triggers** to enforce strict business rules at the lowest physical layer (e.g., preventing duplicate family relations, enforcing maximum plan members based on policy constraints, and performing age validations).
+## 🗄 Domain Entities & Database Schema
+The database is fully normalized and these Domain Entity Classes map exactly to the PostgreSQL tables. We leverage **PostgreSQL Database Triggers** to enforce strict business rules at the lowest physical layer (e.g., preventing duplicate family relations, enforcing maximum plan members based on policy constraints, and performing age validations).
 
 <div align="center">
   <img src="./docs/Medi-Insurance-Class-Diagram.jpeg" alt="Database Entity Class Diagram" width="800" />
