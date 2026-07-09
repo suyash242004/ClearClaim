@@ -12,4 +12,6 @@ export interface Claim {
   status?: string; // Pending / Approved / Rejected
   doctorName?: string;
   description?: string;
+  aiDecision?: string;
+  txHash?: string;
 }

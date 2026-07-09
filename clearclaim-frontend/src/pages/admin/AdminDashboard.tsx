@@ -1,122 +1,352 @@
-// AdminDashboard.tsx
-// First page admin sees after login
-// Shows real statistics fetched from backend business API
-// GET /api/admin/dashboard
-
-import { useEffect, useState } from "react";
-import AdminHttpService from "../../services/AdminHttpService";
-import type { DashboardStats } from "../../models/DashboardStats";
+// AdminDashboard.tsx — AI agent control center
+import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { readApi } from "../../services/axiosConfig";
+import { AgentHttpService, type ClaimDecision, type SSEEvent } from "../../services/AgentHttpService";
+import StatCard from "../../components/StatCard";
+import AgentStatusPanel, {
+  type LogEntry, createLog,
+} from "../../components/AgentStatusPanel";
+import TerminalWindow from "../../components/TerminalWindow";
+import GhastButton from "../../components/GhastButton";
+import ClaimStatusChip from "../../components/ClaimStatusChip";
+import FraudScoreBadge from "../../components/FraudScoreBadge";
 import {
-  Users,
-  FileText,
-  ClipboardList,
-  CheckSquare,
-  XSquare,
-  Building2,
-  IndianRupee,
-  LayoutDashboard,
+  FileText, Clock, CheckCircle, XCircle,
+  Bot, AlertTriangle, RotateCcw, Sparkles
 } from "lucide-react";
 
-const AdminDashboard = () => {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+interface DashboardStats {
+  totalClaims: number;
+  pendingClaims: number;
+  approvedClaims: number;
+  rejectedClaims: number;
+}
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await AdminHttpService.getDashboardStats();
-        setStats(res.record);
-      } catch {
-        setError("Failed to load dashboard stats.");
-      } finally {
-        setLoading(false);
+interface PendingClaim {
+  claimId: number;
+  disease: string;
+  claimAmount: number;
+  fraudScore?: number;
+  aiDecision?: string;
+}
+
+export default function AdminDashboard() {
+  const [stats, setStats] = useState<DashboardStats>({
+    totalClaims: 0, pendingClaims: 0, approvedClaims: 0, rejectedClaims: 0,
+  });
+  const [pendingClaims, setPendingClaims] = useState<PendingClaim[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [isAgentRunning, setIsAgentRunning] = useState(false);
+  const [agentResults, setAgentResults] = useState<Record<number, ClaimDecision>>({});
+  const [lastRun, setLastRun] = useState<string | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const sseCleanup = useRef<(() => void) | null>(null);
+
+  const addLog = (msg: string, type: LogEntry["type"]) =>
+    setLogs(prev => [...prev, createLog(Date.now(), msg, type)]);
+
+  const loadData = async () => {
+    setStatsLoading(true);
+    try {
+      const [dashRes, pendRes] = await Promise.all([
+        readApi.get("/api/admin/dashboard"),
+        readApi.get("/api/admin/claims/pending"),
+      ]);
+      const d = dashRes.data?.record;
+      if (d) {
+        setStats({
+          totalClaims: d.totalClaims ?? 0,
+          pendingClaims: d.pendingClaims ?? 0,
+          approvedClaims: d.approvedClaims ?? 0,
+          rejectedClaims: d.rejectedClaims ?? 0,
+        });
       }
-    };
-    fetchStats();
-  }, []);
+      const pendClaims = pendRes.data?.records ?? [];
 
-  if (loading) return <div className="text-slate-500 text-sm">Loading...</div>;
-  if (error) return <div className="text-red-500 text-sm">{error}</div>;
+      // Batch-fetch fraud scores if they are missing
+      const claimsWithoutScores = pendClaims.filter((c: PendingClaim) => c.fraudScore == null);
+      if (claimsWithoutScores.length > 0) {
+        await Promise.allSettled(
+          claimsWithoutScores.map(async (c: PendingClaim) => {
+            try {
+              const fRes = await AgentHttpService.getFraudScore(c.claimId);
+              if (fRes.data) {
+                c.fraudScore = fRes.data.score;
+              }
+            } catch (e) {
+              // Ignore failure for individual scores
+            }
+          })
+        );
+      }
+      setPendingClaims(pendClaims);
+    } catch (e) {
+      console.error("Dashboard load error", e);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
-  // Stat card data
-  const statCards = [
-    {
-      label: "Total Customers",
-      value: stats?.totalCustomers,
-      icon: <Users size={20} className="text-blue-700" />,
-      bg: "bg-blue-50",
-    },
-    {
-      label: "Active Policies",
-      value: stats?.activePolicies,
-      icon: <FileText size={20} className="text-sky-600" />,
-      bg: "bg-sky-50",
-    },
-    {
-      label: "Pending Claims",
-      value: stats?.pendingClaims,
-      icon: <ClipboardList size={20} className="text-amber-600" />,
-      bg: "bg-amber-50",
-    },
-    {
-      label: "Approved Claims",
-      value: stats?.approvedClaims,
-      icon: <CheckSquare size={20} className="text-green-600" />,
-      bg: "bg-green-50",
-    },
-    {
-      label: "Rejected Claims",
-      value: stats?.rejectedClaims,
-      icon: <XSquare size={20} className="text-red-600" />,
-      bg: "bg-red-50",
-    },
-    {
-      label: "Total Hospitals",
-      value: stats?.totalHospitals,
-      icon: <Building2 size={20} className="text-purple-600" />,
-      bg: "bg-purple-50",
-    },
-    {
-      label: "Total Plans",
-      value: stats?.totalPlans,
-      icon: <LayoutDashboard size={20} className="text-indigo-600" />,
-      bg: "bg-indigo-50",
-    },
-    {
-      label: "Total Revenue (₹)",
-      value: (stats?.totalRevenue ?? 0).toLocaleString(),
-      icon: <IndianRupee size={20} className="text-emerald-600" />,
-      bg: "bg-emerald-50",
-    },
-  ];
+  useEffect(() => { loadData(); }, []);
+
+  const runAIAgent = () => {
+    // Cancel any existing stream
+    if (sseCleanup.current) { sseCleanup.current(); sseCleanup.current = null; }
+
+    setIsAgentRunning(true);
+    setLogs([]);
+    addLog("Initializing ClearClaim AI Agent v1.0…", "info");
+    addLog(`Connecting to Gemini 2.5 Flash via SSE stream…`, "info");
+
+    const cleanup = AgentHttpService.streamProcessClaims(
+      // Per-event handler
+      (event: SSEEvent) => {
+        if (event.type === "start") {
+          addLog(event.message ?? "Starting…", "info");
+        } else if (event.type === "processing") {
+          addLog(event.message ?? `Analyzing claim #${event.claim_id}…`, "processing");
+        } else if (event.type === "result" && event.claim_id != null) {
+          const logType = event.decision === "Approve" ? "success"
+                        : event.decision === "Reject"  ? "error"
+                        : "warning";
+          addLog(event.message ?? `Claim #${event.claim_id}: ${event.decision}`, logType);
+          // Merge into results map
+          setAgentResults(prev => ({
+            ...prev,
+            [event.claim_id!]: {
+              claim_id: event.claim_id!,
+              decision: event.decision as ClaimDecision["decision"],
+              reasoning: event.reasoning ?? "",
+              confidence_score: event.confidence_score ?? 0,
+              fraud_indicators: event.fraud_indicators ?? [],
+              tx_hash: event.tx_hash ?? null,
+            },
+          }));
+        }
+      },
+      // On complete
+      async () => {
+        addLog("All decisions written to database.", "success");
+        addLog("Blockchain tx hashes recorded on X Layer ⛓️", "success");
+        setLastRun(new Date().toLocaleTimeString("en-US", { hour12: false }));
+        setIsAgentRunning(false);
+        sseCleanup.current = null;
+        // Reload stats
+        try {
+          const dashRes = await readApi.get("/api/admin/dashboard");
+          const d = dashRes.data?.record;
+          if (d) setStats({
+            totalClaims:    d.totalClaims ?? 0,
+            pendingClaims:  d.pendingClaims ?? 0,
+            approvedClaims: d.approvedClaims ?? 0,
+            rejectedClaims: d.rejectedClaims ?? 0,
+          });
+          await loadData();
+        } catch { /* stats reload is best-effort */ }
+      },
+      // On error
+      (err: string) => {
+        addLog(`Agent error: ${err}`, "error");
+        addLog("Make sure Python agent is running: cd agents && python main.py", "warning");
+        setIsAgentRunning(false);
+        sseCleanup.current = null;
+      }
+    );
+
+    sseCleanup.current = cleanup;
+  };
+
+  const summaryTiles = Object.keys(agentResults).length > 0 ? [
+    { label: "Approved",  count: Object.values(agentResults).filter(r => r.decision === "Approve").length, color: "#34D399" },
+    { label: "Rejected",  count: Object.values(agentResults).filter(r => r.decision === "Reject").length,  color: "#F87171" },
+    { label: "Flagged",   count: Object.values(agentResults).filter(r => r.decision === "Flag").length,    color: "#FBBF24" },
+  ] : [];
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-slate-800 mb-1">
-        Admin Dashboard
-      </h2>
-      <p className="text-slate-500 text-sm mb-6">
-        Real-time overview of the insurance portal.
-      </p>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35 }}
+      className="space-y-6"
+    >
+      {/* ── Page header ── */}
+      <div className="flex items-start justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#F8FAFC" }}>
+            Control Center
+          </h1>
+          <p className="text-sm mt-1.5" style={{ color: "#888899" }}>
+            Autonomous AI claim adjudication dashboard
+          </p>
+        </div>
 
-      {/* Stat Cards Grid */}
-      <div className="grid grid-cols-4 gap-4">
-        {statCards.map((card) => (
-          <div
-            key={card.label}
-            className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4"
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={loadData}
+            disabled={statsLoading}
+            className="btn-ghost flex items-center gap-1.5 text-xs"
           >
-            <div className={`${card.bg} p-3 rounded-lg`}>{card.icon}</div>
-            <div>
-              <p className="text-2xl font-bold text-slate-800">{card.value}</p>
-              <p className="text-xs text-slate-500">{card.label}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+            <RotateCcw size={12} className={statsLoading ? "animate-spin" : ""} />
+            Refresh
+          </button>
 
-export default AdminDashboard;
+          <GhastButton
+            onClick={runAIAgent}
+            disabled={isAgentRunning}
+            variant="light"
+            className="text-sm gap-2"
+          >
+            {isAgentRunning ? (
+              <span className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+            ) : (
+              <Bot size={15} />
+            )}
+            {isAgentRunning ? "AI Running…" : "Run AI Agent"}
+          </GhastButton>
+        </div>
+      </div>
+
+      {/* ── Stats row ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Total Claims"  value={stats.totalClaims}    icon={FileText}     color="#60A5FA" delay={0}   />
+        <StatCard label="Pending"       value={stats.pendingClaims}  icon={Clock}        color="#FBBF24" delay={0.08}/>
+        <StatCard label="Approved"      value={stats.approvedClaims} icon={CheckCircle}  color="#34D399" delay={0.16}/>
+        <StatCard label="Rejected"      value={stats.rejectedClaims} icon={XCircle}      color="#F87171" delay={0.24}/>
+      </div>
+
+      {/* ── Main two-column layout ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
+
+        {/* Terminal col — 3/5 */}
+        <div className="xl:col-span-3 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold" style={{ color: "#F8FAFC" }}>
+                AI Terminal
+              </span>
+              {isAgentRunning && (
+                <span
+                  className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full animate-pulse"
+                  style={{ background: "rgba(16,185,129,0.12)", color: "#34D399", border: "1px solid rgba(16,185,129,0.2)" }}
+                >
+                  Live
+                </span>
+              )}
+            </div>
+            {lastRun && (
+              <span className="text-xs" style={{ color: "#555" }}>
+                Last run: {lastRun}
+              </span>
+            )}
+          </div>
+
+          <TerminalWindow title="AI Agent — ClearClaim v1.0">
+            <AgentStatusPanel logs={logs} isRunning={isAgentRunning} />
+          </TerminalWindow>
+
+          {/* Agent run summary tiles */}
+          {summaryTiles.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="grid grid-cols-3 gap-3"
+            >
+              {summaryTiles.map(({ label, count, color }) => (
+                <div
+                  key={label}
+                  className="card p-4 text-center"
+                  style={{ border: `1px solid ${color}20` }}
+                >
+                  <p className="text-2xl font-bold" style={{ color }}>{count}</p>
+                  <p className="text-xs mt-1" style={{ color: "#475569" }}>{label}</p>
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </div>
+
+        {/* Pending claims sidebar — 2/5 */}
+        <div className="xl:col-span-2">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={14} style={{ color: "#FBBF24" }} />
+              <span className="text-sm font-semibold" style={{ color: "#F8FAFC" }}>
+                Pending Review
+              </span>
+              <span
+                className="text-xs px-1.5 py-0.5 rounded-md font-semibold"
+                style={{ background: "rgba(245,158,11,0.12)", color: "#FBBF24" }}
+              >
+                {pendingClaims.length}
+              </span>
+            </div>
+            {pendingClaims.length > 0 && !isAgentRunning && (
+              <div className="flex items-center gap-1 text-xs" style={{ color: "#334155" }}>
+                <Sparkles size={11} />
+                Run AI to process
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {pendingClaims.length === 0 && !statsLoading && (
+              <div className="card p-5 text-center">
+                <CheckCircle size={22} style={{ color: "#34D399" }} className="mx-auto mb-2" />
+                <p className="text-sm font-medium" style={{ color: "#F8FAFC" }}>All clear!</p>
+                <p className="text-xs mt-0.5" style={{ color: "#475569" }}>No pending claims.</p>
+              </div>
+            )}
+
+            {pendingClaims.slice(0, 7).map((claim, i) => {
+              const aiResult = agentResults[claim.claimId];
+              const decision = aiResult ? aiResult.decision : (claim.aiDecision ?? "Pending");
+              let dotColor = "#555";
+              if (decision === "Approve") dotColor = "#10B981";
+              if (decision === "Reject") dotColor = "#EF4444";
+              if (decision === "Flag") dotColor = "#F59E0B";
+
+              return (
+                <motion.div
+                  key={claim.claimId}
+                  initial={{ opacity: 0, x: 12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  className="card p-3 flex items-center justify-between gap-3 relative overflow-hidden"
+                >
+                  {/* Left edge colored indicator */}
+                  <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: dotColor }} />
+                  
+                  <div className="flex-1 min-w-0 pl-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold" style={{ color: "#6366F1" }}>
+                        #{claim.claimId}
+                      </span>
+                      <span className="text-xs font-medium truncate" style={{ color: "#E2E8F0" }}>
+                        {claim.disease}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs" style={{ color: "#888899" }}>
+                        ₹{Number(claim.claimAmount).toLocaleString("en-IN")}
+                      </span>
+                      {(claim.fraudScore != null) && (
+                        <FraudScoreBadge score={claim.fraudScore} />
+                      )}
+                    </div>
+                  </div>
+                  
+                  {decision !== "Pending" && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded" style={{ background: "rgba(255,255,255,0.05)", color: dotColor }}>
+                      {decision}
+                    </span>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}

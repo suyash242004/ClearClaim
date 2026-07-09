@@ -56,6 +56,7 @@ const FamilyMembers = () => {
   const [allMembers, setAllMembers] = useState<Familymember[]>([]);
   const [filteredMembers, setFilteredMembers] = useState<Familymember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   // --- Add member form ---
   const [showForm, setShowForm] = useState(false);
@@ -209,33 +210,34 @@ const FamilyMembers = () => {
   };
 
   // Delete a family member
-  const handleDelete = async (memberId: number, name: string) => {
-    if (!confirm(`Remove ${name} from this policy?`)) return;
+  const handleDelete = async (memberId: number) => {
     setError("");
     setSuccess("");
     try {
       const res = await FamilymemberHttpService.delete(memberId);
       setSuccess(res.message ?? "Family member removed.");
       setAllMembers((prev) => prev.filter((m) => m.memberId !== memberId));
+      setDeletingId(null);
     } catch (err: any) {
       const errMsg = err.response?.data?.errorMessage || (typeof err.response?.data === 'string' ? err.response.data : "Failed to remove member.");
       setError(errMsg);
+      setDeletingId(null);
     }
   };
 
   return (
     <div>
       {/* Page Header */}
-      <h2 className="text-xl font-semibold text-slate-800 mb-1">
+      <h2 className="text-xl font-semibold text-white mb-1">
         Family Members
       </h2>
-      <p className="text-slate-500 text-sm mb-6">
+      <p className="text-slate-400 text-sm mb-6">
         Manage family members covered under your insurance policies.
       </p>
 
       {/* Policy Selector */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
-        <label className="block text-sm text-slate-600 mb-2 font-medium">
+      <div className="card p-5 mb-5">
+        <label className="block text-sm text-slate-300 mb-2 font-medium">
           Select Policy
         </label>
         <select
@@ -246,13 +248,12 @@ const FamilyMembers = () => {
             setSuccess("");
             setRelation("");
           }}
-          className="w-full max-w-sm border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="input-indigo"
         >
           <option value="">-- Select a Policy --</option>
-          {policies.map((p) => (
+          {policies.map((p: any) => (
             <option key={p.policyId} value={p.policyId}>
-              Policy #{p.policyId} — Plan {p.planId}{" "}
-              ({p.isActive ? "Active" : "Inactive"}) — till {p.endDate}
+              Policy #{p.policyId} — {p.planName ? `Plan: ${p.planName}` : `Plan ID: ${p.planId}`} ({p.isActive ? "Active" : "Inactive"}) — till {p.endDate}
             </option>
           ))}
         </select>
@@ -260,17 +261,17 @@ const FamilyMembers = () => {
 
       {/* Plan Rules Banner — shown after policy is selected */}
       {selectedPlan && !loadingPlan && (
-        <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5">
-          <Info size={18} className="text-blue-600 mt-0.5 shrink-0" />
+        <div className="flex items-start gap-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 mb-5">
+          <Info size={18} className="text-indigo-400 mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-blue-700">
+            <p className="text-sm font-semibold text-indigo-400">
               {selectedPlan.planName}
             </p>
-            <p className="text-sm text-blue-600 mt-0.5">
+            <p className="text-sm text-indigo-300/80 mt-0.5">
               {getPlanRule(selectedPlan.planId)}
             </p>
             {allowedRelations.length > 0 && (
-              <p className="text-xs text-blue-500 mt-1">
+              <p className="text-xs text-indigo-400/80 mt-1">
                 Slots: {filteredMembers.length} / {maxMembers} used —{" "}
                 <span className="font-semibold">{slotsRemaining} remaining</span>
               </p>
@@ -281,12 +282,12 @@ const FamilyMembers = () => {
 
       {/* Feedback */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-4 py-3 rounded-lg mb-4">
           {error}
         </div>
       )}
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-4 py-3 rounded-lg mb-4">
+        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm px-4 py-3 rounded-lg mb-4">
           {success}
         </div>
       )}
@@ -296,12 +297,12 @@ const FamilyMembers = () => {
         <>
           {/* Personal plan — block message */}
           {allowedRelations.length === 0 ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 text-center">
               <Users className="mx-auto text-amber-400 mb-2" size={32} />
-              <p className="text-amber-700 text-sm font-medium">
+              <p className="text-amber-400 text-sm font-medium">
                 This plan does not cover family members.
               </p>
-              <p className="text-amber-500 text-xs mt-1">
+              <p className="text-amber-400/80 text-xs mt-1">
                 Upgrade to Family or Parent plan to add family coverage.
               </p>
             </div>
@@ -310,11 +311,11 @@ const FamilyMembers = () => {
               {/* Header row */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <Users size={18} className="text-blue-700" />
-                  <h3 className="text-slate-800 font-semibold text-sm">
+                  <Users size={18} className="text-indigo-400" />
+                  <h3 className="text-white font-semibold text-sm">
                     Members under Policy #{selectedPolicyId}
                   </h3>
-                  <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                     {filteredMembers.length}/{maxMembers}
                   </span>
                 </div>
@@ -326,15 +327,15 @@ const FamilyMembers = () => {
                       setError("");
                       setSuccess("");
                     }}
-                    className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+                    className="btn-ghast flex items-center gap-2 text-xs py-1.5 px-3"
                   >
-                    <UserPlus size={16} />
+                    <UserPlus size={14} />
                     Add Member
                   </button>
                 )}
 
                 {!canAdd && (
-                  <span className="text-xs text-slate-400 italic">
+                  <span className="text-xs text-slate-500 italic">
                     {slotsRemaining === 0
                       ? "Maximum members reached"
                       : "All allowed relations already added"}
@@ -344,15 +345,15 @@ const FamilyMembers = () => {
 
               {/* Add Member Form */}
               {showForm && canAdd && (
-                <div className="bg-white rounded-xl border border-blue-200 p-5 mb-5">
-                  <h4 className="text-slate-700 font-medium text-sm mb-4">
+                <div className="card p-5 mb-5 border-indigo-500/20">
+                  <h4 className="text-white font-medium text-sm mb-4">
                     New Family Member
                   </h4>
                   <div className="grid grid-cols-2 gap-4 mb-4">
 
                     {/* Member Name */}
                     <div>
-                      <label className="block text-sm text-slate-600 mb-1">
+                      <label className="block text-sm text-slate-300 mb-1">
                         Member Name *
                       </label>
                       <input
@@ -360,19 +361,19 @@ const FamilyMembers = () => {
                         value={memberName}
                         onChange={(e) => setMemberName(e.target.value)}
                         placeholder="e.g. Priya Sharma"
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-indigo"
                       />
                     </div>
 
                     {/* Relation — only available (allowed + not yet used) */}
                     <div>
-                      <label className="block text-sm text-slate-600 mb-1">
+                      <label className="block text-sm text-slate-300 mb-1">
                         Relation *
                       </label>
                       <select
                         value={relation}
                         onChange={(e) => setRelation(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-indigo"
                       >
                         <option value="">-- Select Relation --</option>
                         {availableRelations.map((r) => (
@@ -381,16 +382,16 @@ const FamilyMembers = () => {
                           </option>
                         ))}
                       </select>
-                      <p className="text-xs text-slate-400 mt-1">
+                      <p className="text-xs text-slate-500 mt-1">
                         Only relations not yet added are shown
                       </p>
                     </div>
 
                     {/* Age */}
                     <div>
-                      <label className="block text-sm text-slate-600 mb-1">
+                      <label className="block text-sm text-slate-300 mb-1">
                         Age{" "}
-                        <span className="text-slate-400">(optional)</span>
+                        <span className="text-slate-500">(optional)</span>
                       </label>
                       <input
                         type="number"
@@ -399,15 +400,15 @@ const FamilyMembers = () => {
                         placeholder="e.g. 35"
                         min={1}
                         max={149}
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-indigo"
                       />
                       {(relation === "Father" || relation === "Mother") && (
-                        <p className="text-xs text-amber-500 mt-1">
+                        <p className="text-xs text-amber-400 mt-1">
                           ⚠ Parent must be older than you (DB validated)
                         </p>
                       )}
                       {(relation === "Son" || relation === "Daughter") && (
-                        <p className="text-xs text-amber-500 mt-1">
+                        <p className="text-xs text-amber-400 mt-1">
                           ⚠ Child must be younger than you (DB validated)
                         </p>
                       )}
@@ -415,14 +416,14 @@ const FamilyMembers = () => {
 
                     {/* Gender */}
                     <div>
-                      <label className="block text-sm text-slate-600 mb-1">
+                      <label className="block text-sm text-slate-300 mb-1">
                         Gender{" "}
-                        <span className="text-slate-400">(optional)</span>
+                        <span className="text-slate-500">(optional)</span>
                       </label>
                       <select
                         value={gender}
                         onChange={(e) => setGender(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-indigo"
                       >
                         <option value="">-- Select Gender --</option>
                         {GENDERS.map((g) => (
@@ -438,9 +439,9 @@ const FamilyMembers = () => {
                     <button
                       onClick={handleAdd}
                       disabled={submitting}
-                      className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm px-5 py-2 rounded-lg transition-colors disabled:opacity-50"
+                      className="btn-primary flex items-center gap-2 text-xs py-2 px-4"
                     >
-                      <UserPlus size={15} />
+                      <UserPlus size={14} />
                       {submitting ? "Adding..." : "Add Member"}
                     </button>
                     <button
@@ -452,7 +453,7 @@ const FamilyMembers = () => {
                         setGender("");
                         setError("");
                       }}
-                      className="text-sm px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
+                      className="btn-ghost text-xs py-2 px-4"
                     >
                       Cancel
                     </button>
@@ -462,50 +463,69 @@ const FamilyMembers = () => {
 
               {/* Members Table */}
               {loadingMembers ? (
-                <div className="text-slate-500 text-sm">Loading members...</div>
+                <div className="flex items-center justify-center h-48 card">
+                  <span className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+                </div>
               ) : filteredMembers.length === 0 ? (
-                <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-                  <Users className="mx-auto text-slate-300 mb-2" size={36} />
+                <div className="card p-8 text-center">
+                  <Users className="mx-auto text-slate-500 mb-2" size={36} />
                   <p className="text-slate-400 text-sm">
                     No family members added under this policy yet.
                   </p>
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-slate-50 border-b border-slate-200">
+                <div className="card overflow-hidden">
+                  <table className="table-dark w-full text-sm">
+                    <thead>
                       <tr>
-                        <th className="text-left px-4 py-3 text-slate-500 font-medium">ID</th>
-                        <th className="text-left px-4 py-3 text-slate-500 font-medium">Name</th>
-                        <th className="text-left px-4 py-3 text-slate-500 font-medium">Relation</th>
-                        <th className="text-left px-4 py-3 text-slate-500 font-medium">Age</th>
-                        <th className="text-left px-4 py-3 text-slate-500 font-medium">Gender</th>
-                        <th className="text-left px-4 py-3 text-slate-500 font-medium">Action</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Name</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Relation</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Age</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Gender</th>
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredMembers.map((member) => (
                         <tr
                           key={member.memberId}
-                          className="border-b border-slate-100 hover:bg-slate-50"
+                          className="border-b border-white/5 hover:bg-white/5"
                         >
-                          <td className="px-4 py-3 text-slate-500 text-xs">{member.memberId}</td>
-                          <td className="px-4 py-3 text-slate-700 font-medium">{member.memberName}</td>
+                          <td className="px-4 py-3 text-slate-400 text-xs font-mono">#{member.memberId}</td>
+                          <td className="px-4 py-3 text-white font-medium">{member.memberName}</td>
                           <td className="px-4 py-3">
-                            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full font-medium">
+                            <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-1 rounded font-bold uppercase tracking-wider">
                               {member.relation}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-slate-700">{member.age ?? "—"}</td>
-                          <td className="px-4 py-3 text-slate-700">{member.gender ?? "—"}</td>
+                          <td className="px-4 py-3 text-slate-300">{member.age ?? "—"}</td>
+                          <td className="px-4 py-3 text-slate-300">{member.gender ?? "—"}</td>
                           <td className="px-4 py-3">
-                            <button
-                              onClick={() => handleDelete(member.memberId, member.memberName)}
-                              className="flex items-center gap-1 text-red-500 hover:text-red-700 text-xs font-medium transition-colors"
-                            >
-                              <Trash2 size={14} />
-                              Remove
-                            </button>
+                            {deletingId === member.memberId ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleDelete(member.memberId)}
+                                  className="text-xs bg-red-500/10 text-red-500 hover:bg-red-500/20 px-2 py-1 rounded transition-colors"
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={() => setDeletingId(null)}
+                                  className="text-xs text-slate-400 hover:text-white px-2 py-1 transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setDeletingId(member.memberId)}
+                                className="flex items-center gap-1 text-red-400 hover:text-red-300 text-xs font-medium transition-colors"
+                              >
+                                <Trash2 size={14} />
+                                Remove
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}

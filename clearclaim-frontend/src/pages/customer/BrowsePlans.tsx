@@ -1,414 +1,237 @@
-// BrowsePlans.tsx
-// Customer can search, view hospitals, and compare insurance plans
-// Compare uses: GET /api/plans/compare?planIds=1&planIds=2
-// Supports selecting 2-4 plans for side-by-side comparison
+// BrowsePlans.tsx — Premium plan grid + AI advisor
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../store/store";
+import { readApi, writeApi } from "../../services/axiosConfig";
+import PolicyAdvisorWidget from "../../components/PolicyAdvisorWidget";
+import SpotlightCard from "../../components/SpotlightCard";
+import GhastButton from "../../components/GhastButton";
+import { Bot, ShieldCheck, Check, Star, Users, Calendar, CheckCircle } from "lucide-react";
 
-import { useState } from "react";
-import PlanSearchHttpService from "../../services/PlanSearchHttpService";
-import type { Insuranceplan } from "../../models/Insuranceplan";
-import type { Hospital } from "../../models/Hospital";
-import { Search, GitCompareArrows, X, CheckCircle, IndianRupee } from "lucide-react";
+interface Plan {
+  planId: number;
+  planName: string;
+  coverageAmount: number;
+  premiumAmount: number;
+  description: string;
+  maxMembers: number;
+  policyDuration?: number;
+}
 
-const BrowsePlans = () => {
-  // --- Search ---
-  const [city, setCity] = useState("");
-  const [maxPremium, setMaxPremium] = useState("");
-  const [minCoverage, setMinCoverage] = useState("");
-  const [plans, setPlans] = useState<Insuranceplan[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+const ACCENT_COLORS = ["#60A5FA", "#34D399", "#FBBF24", "#F87171"];
 
-  // --- Hospitals panel ---
-  const [hospitals, setHospitals] = useState<Hospital[]>([]);
-  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+export default function BrowsePlans() {
+  const { userId } = useSelector((state: RootState) => state.auth);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [purchasing, setPurchasing] = useState<number | null>(null);
+  const [purchased, setPurchased] = useState<number | null>(null);
+  const [showAdvisor, setShowAdvisor] = useState(false);
 
-  // --- Compare ---
-  const [comparePlanIds, setComparePlanIds] = useState<number[]>([]);
-  const [compareResults, setCompareResults] = useState<Insuranceplan[]>([]);
-  const [comparing, setComparing] = useState(false);
-  const [compareError, setCompareError] = useState("");
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await readApi.get("/api/PlanSearch");
+        setPlans(res.data?.records ?? []);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
-  // Search plans
-  const handleSearch = async () => {
-    setError("");
-    setMessage("");
-    setLoading(true);
-    setCompareResults([]);
-    setComparePlanIds([]);
+  const handlePurchase = async (plan: Plan) => {
+    setPurchasing(plan.planId);
     try {
-      const res = await PlanSearchHttpService.searchPlans(
-        city || undefined,
-        maxPremium ? Number(maxPremium) : undefined,
-        minCoverage ? Number(minCoverage) : undefined,
-      );
-      setPlans(res.records ?? []);
-      if ((res.records ?? []).length === 0)
-        setMessage("No plans found for given filters.");
-    } 
-    catch (err: any) {
-      setError(err.response?.data || "Search failed.");
-    } 
-    finally {
-      setLoading(false);
-    }
-  };
-
-  // View hospitals for a plan
-  const handleViewHospitals = async (planId: number) => {
-    if (selectedPlanId === planId) {
-      setSelectedPlanId(null);
-      setHospitals([]);
-      return;
-    }
-    setSelectedPlanId(planId);
-    try {
-      const res = await PlanSearchHttpService.getHospitalsByPlan(planId);
-      setHospitals(res.records ?? []);
+      await writeApi.post("/api/PolicyWrite", {
+        customerId: userId,
+        planId: plan.planId,
+        startDate: new Date().toISOString(),
+        endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        coverageAmount: plan.coverageAmount,
+        premiumAmount: plan.premiumAmount,
+        status: "Active",
+      });
+      setPurchased(plan.planId);
+      setTimeout(() => setPurchased(null), 3000);
     } catch {
-      setHospitals([]);
-    }
-  };
-
-  // Toggle plan selection for compare (max 4)
-  const toggleCompare = (planId: number) => {
-    setComparePlanIds((prev) => {
-      if (prev.includes(planId)) return prev.filter((id) => id !== planId);
-      if (prev.length >= 4) return prev; // max 4
-      return [...prev, planId];
-    });
-    setCompareResults([]); // reset previous comparison
-    setCompareError("");
-  };
-
-  // Run comparison
-  const handleCompare = async () => {
-    if (comparePlanIds.length < 2) return;
-    setComparing(true);
-    setCompareError("");
-    setCompareResults([]);
-    try {
-      const res = await PlanSearchHttpService.comparePlans(comparePlanIds);
-      setCompareResults(res.records ?? []);
-    } catch (err: any) {
-      setCompareError(err.response?.data || "Comparison failed.");
+      alert("Purchase failed. Please try again.");
     } finally {
-      setComparing(false);
+      setPurchasing(null);
     }
   };
 
-  // Highlight best value in comparison (lowest premium, highest coverage, most members)
-  const getBestPremium = () => Math.min(...compareResults.map((p) => p.premiumAmount));
-  const getBestCoverage = () => Math.max(...compareResults.map((p) => p.coverageAmount));
-  const getBestMembers = () => Math.max(...compareResults.map((p) => p.maxMembers));
+  // Mark "Best Value" as the plan with the best coverage/premium ratio
+  const bestValueId = plans.length > 0
+    ? plans.reduce((best, p) =>
+        (p.coverageAmount / p.premiumAmount) > (best.coverageAmount / best.premiumAmount) ? p : best
+      ).planId
+    : -1;
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-slate-800 mb-1">Browse Plans</h2>
-      <p className="text-slate-500 text-sm mb-6">
-        Search, explore and compare insurance plans side by side.
-      </p>
-
-      {/* Search Filters */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          <div>
-            <label className="text-sm text-slate-500 mb-1 block">City</label>
-            <input
-              type="text"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="e.g. Pune"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-slate-500 mb-1 block">Max Premium (₹)</label>
-            <input
-              type="number"
-              value={maxPremium}
-              onChange={(e) => setMaxPremium(e.target.value)}
-              placeholder="e.g. 10000"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-slate-500 mb-1 block">Min Coverage (₹)</label>
-            <input
-              type="number"
-              value={minCoverage}
-              onChange={(e) => setMinCoverage(e.target.value)}
-              placeholder="e.g. 500000"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 relative">
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-lg font-bold" style={{ color: "#F8FAFC" }}>Insurance Plans</h1>
+          <p className="text-sm mt-0.5" style={{ color: "#475569" }}>
+            Choose the right coverage for you and your family.
+          </p>
         </div>
-        <button
-          onClick={handleSearch}
-          className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+        <GhastButton
+          onClick={() => setShowAdvisor(true)}
+          variant="dark"
+          className="text-xs px-4 py-2"
         >
-          <Search size={16} />
-          {loading ? "Searching..." : "Search Plans"}
-        </button>
+          <Bot size={13} style={{ color: "#6366F1" }} className="animate-pulse-glow" />
+          AI Advisor
+        </GhastButton>
       </div>
 
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-      {message && <p className="text-slate-400 text-sm mb-4">{message}</p>}
+      {/* ── Purchase success toast ── */}
+      <AnimatePresence>
+        {purchased && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl"
+            style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)" }}
+          >
+            <CheckCircle size={16} style={{ color: "#34D399" }} />
+            <p className="text-sm font-medium" style={{ color: "#34D399" }}>
+              Plan purchased successfully! Check My Policies to view it.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Plans Table */}
-      {plans.length > 0 && (
-        <>
-          {/* Compare action bar — floats above table when plans are selected */}
-          {comparePlanIds.length > 0 && (
-            <div className="flex items-center justify-between bg-blue-700 text-white px-5 py-3 rounded-xl mb-3">
-              <div className="flex items-center gap-2 text-sm">
-                <GitCompareArrows size={18} />
-                <span>
-                  <span className="font-semibold">{comparePlanIds.length}</span>{" "}
-                  plan{comparePlanIds.length > 1 ? "s" : ""} selected for comparison
-                  {comparePlanIds.length < 2 && " — select at least 2"}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCompare}
-                  disabled={comparePlanIds.length < 2 || comparing}
-                  className="bg-white text-blue-700 font-semibold text-sm px-4 py-1.5 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
-                >
-                  {comparing ? "Comparing..." : "Compare Now"}
-                </button>
-                <button
-                  onClick={() => { setComparePlanIds([]); setCompareResults([]); }}
-                  className="text-blue-200 hover:text-white text-sm px-2 py-1.5"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-          )}
+      {/* ── Plan grid ── */}
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <span className="w-8 h-8 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {plans.map((plan, i) => {
+            const isBest  = plan.planId === bestValueId;
+            const color   = ACCENT_COLORS[i % ACCENT_COLORS.length];
 
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="text-left px-4 py-3 text-slate-500 font-medium w-8">
-                    Compare
-                  </th>
-                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Plan Name</th>
-                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Premium (₹)</th>
-                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Coverage (₹)</th>
-                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Max Members</th>
-                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Duration</th>
-                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Hospitals</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plans.map((plan) => {
-                  const isChecked = comparePlanIds.includes(plan.planId);
-                  const isDisabled = !isChecked && comparePlanIds.length >= 4;
-                  return (
-                    <tr
-                      key={plan.planId}
-                      className={`border-b border-slate-100 hover:bg-slate-50 ${isChecked ? "bg-blue-50/40" : ""}`}
+            return (
+              <motion.div
+                key={plan.planId}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.08 }}
+                className="h-full"
+              >
+                <SpotlightCard
+                  className="flex flex-col h-full"
+                  style={{
+                    borderColor: isBest ? "#6366F1" : plan.planName.toLowerCase().includes('family') ? "#F59E0B" : "#222",
+                    background: "#080810",
+                  }}
+                >
+                  {/* Recommended badge */}
+                  {isBest && (
+                    <div className="absolute top-0 inset-x-0 flex justify-center -translate-y-1/2 z-20">
+                      <div
+                        className="px-3 py-0.5 text-[10px] font-bold tracking-[0.2em] uppercase flex items-center gap-1.5"
+                        style={{
+                          background: "#6366F1",
+                          color: "white",
+                          borderRadius: "99px",
+                          boxShadow: "0 0 20px rgba(99,102,241,0.4)"
+                        }}
+                      >
+                        <Star size={9} fill="white" /> Recommended
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Plan icon */}
+                  <div className="p-6 pb-0">
+                    <div
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5"
+                      style={{ 
+                        background: isBest ? "rgba(99,102,241,0.1)" : plan.planName.toLowerCase().includes('family') ? "rgba(245,158,11,0.1)" : "rgba(255,255,255,0.05)", 
+                        border: `1px solid ${isBest ? "rgba(99,102,241,0.2)" : plan.planName.toLowerCase().includes('family') ? "rgba(245,158,11,0.2)" : "rgba(255,255,255,0.1)"}` 
+                      }}
                     >
-                      {/* Compare checkbox */}
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          disabled={isDisabled}
-                          onChange={() => toggleCompare(plan.planId)}
-                          className="w-4 h-4 accent-blue-700 cursor-pointer disabled:opacity-30"
-                          title={isDisabled ? "Max 4 plans for comparison" : "Add to compare"}
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-slate-700 font-medium">{plan.planName}</td>
-                      <td className="px-4 py-3 text-slate-700">₹{plan.premiumAmount.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-slate-700">₹{plan.coverageAmount.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-slate-700">{plan.maxMembers}</td>
-                      <td className="px-4 py-3 text-slate-700">{plan.policyDuration} yr</td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleViewHospitals(plan.planId)}
-                          className={`text-xs font-medium transition-colors ${selectedPlanId === plan.planId ? "text-blue-700 underline" : "text-blue-500 hover:underline"}`}
-                        >
-                          {selectedPlanId === plan.planId ? "Hide" : "View Hospitals"}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+                      <ShieldCheck size={22} style={{ color: isBest ? "#6366F1" : plan.planName.toLowerCase().includes('family') ? "#F59E0B" : "#94A3B8" }} />
+                    </div>
 
-      {/* Hospitals under selected plan */}
-      {selectedPlanId && hospitals.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-          <h3 className="text-slate-700 font-semibold mb-3 text-sm">
-            Hospitals covered under Plan ID {selectedPlanId}
-          </h3>
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="text-left px-4 py-2 text-slate-500 font-medium">Hospital Name</th>
-                <th className="text-left px-4 py-2 text-slate-500 font-medium">City</th>
-                <th className="text-left px-4 py-2 text-slate-500 font-medium">Cashless</th>
-              </tr>
-            </thead>
-            <tbody>
-              {hospitals.map((h) => (
-                <tr key={h.hospitalId} className="border-b border-slate-100">
-                  <td className="px-4 py-2 text-slate-700">{h.hospitalName}</td>
-                  <td className="px-4 py-2 text-slate-700">{h.city}</td>
-                  <td className="px-4 py-2">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${h.isCashless ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
-                      {h.isCashless ? "Yes" : "No"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Compare Error */}
-      {compareError && (
-        <p className="text-red-500 text-sm mb-4">{compareError}</p>
-      )}
-
-      {/* Side-by-Side Comparison Table */}
-      {compareResults.length >= 2 && (
-        <div className="bg-white rounded-xl border border-blue-200 overflow-hidden mb-6">
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-blue-50">
-            <div className="flex items-center gap-2">
-              <GitCompareArrows size={18} className="text-blue-700" />
-              <h3 className="text-blue-800 font-semibold text-sm">
-                Plan Comparison
-              </h3>
-              <span className="text-xs text-blue-500">
-                ({compareResults.length} plans)
-              </span>
-            </div>
-            <button
-              onClick={() => { setCompareResults([]); setComparePlanIds([]); }}
-              className="text-slate-400 hover:text-slate-600"
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          {/* Comparison grid */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="text-left px-5 py-3 text-slate-500 font-medium w-40">
-                    Feature
-                  </th>
-                  {compareResults.map((plan) => (
-                    <th key={plan.planId} className="text-left px-5 py-3 text-slate-700 font-semibold">
+                    {/* Plan name + description */}
+                    <h3 className="font-bold text-lg mb-1" style={{ color: "#fff", letterSpacing: "-0.01em" }}>
                       {plan.planName}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {/* Premium */}
-                <tr className="border-b border-slate-100">
-                  <td className="px-5 py-3 text-slate-500 font-medium">Premium / yr</td>
-                  {compareResults.map((plan) => (
-                    <td key={plan.planId} className="px-5 py-3">
-                      <span className={`font-semibold flex items-center gap-1 ${plan.premiumAmount === getBestPremium() ? "text-green-600" : "text-slate-700"}`}>
-                        <IndianRupee size={13} />
-                        {plan.premiumAmount.toLocaleString()}
-                        {plan.premiumAmount === getBestPremium() && (
-                          <CheckCircle size={14} className="text-green-500" title="Lowest premium" />
-                        )}
+                    </h3>
+                    <p className="text-xs leading-relaxed mb-6 min-h-[36px]" style={{ color: "#888899" }}>
+                      {plan.description}
+                    </p>
+
+                    {/* Premium price */}
+                    <div className="mb-6 flex items-baseline gap-1">
+                      <span className="text-3xl font-bold" style={{ color: "#fff", letterSpacing: "-0.02em" }}>
+                        ₹{plan.premiumAmount.toLocaleString("en-IN")}
                       </span>
-                    </td>
-                  ))}
-                </tr>
+                      <span className="text-xs font-medium" style={{ color: "#64748B" }}>/yr</span>
+                    </div>
 
-                {/* Coverage */}
-                <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <td className="px-5 py-3 text-slate-500 font-medium">Coverage</td>
-                  {compareResults.map((plan) => (
-                    <td key={plan.planId} className="px-5 py-3">
-                      <span className={`font-semibold flex items-center gap-1 ${plan.coverageAmount === getBestCoverage() ? "text-green-600" : "text-slate-700"}`}>
-                        <IndianRupee size={13} />
-                        {plan.coverageAmount.toLocaleString()}
-                        {plan.coverageAmount === getBestCoverage() && (
-                          <CheckCircle size={14} className="text-green-500" title="Highest coverage" />
-                        )}
-                      </span>
-                    </td>
-                  ))}
-                </tr>
+                    {/* Feature list */}
+                    <div className="space-y-3 mb-8">
+                      {[
+                        { icon: ShieldCheck, label: `₹${plan.coverageAmount.toLocaleString("en-IN")} total coverage` },
+                        { icon: Users,      label: `Covers ${plan.maxMembers} member${plan.maxMembers !== 1 ? "s" : ""}` },
+                        { icon: Calendar,   label: `${plan.policyDuration ?? 12}-month policy term` },
+                      ].map(({ icon: Icon, label }) => (
+                        <div key={label} className="flex items-center gap-3 text-xs font-medium" style={{ color: "#94A3B8" }}>
+                          <Icon size={14} style={{ color: isBest ? "#6366F1" : plan.planName.toLowerCase().includes('family') ? "#F59E0B" : "#64748B" }} />
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-                {/* Max Members */}
-                <tr className="border-b border-slate-100">
-                  <td className="px-5 py-3 text-slate-500 font-medium">Max Members</td>
-                  {compareResults.map((plan) => (
-                    <td key={plan.planId} className="px-5 py-3">
-                      <span className={`font-semibold flex items-center gap-1 ${plan.maxMembers === getBestMembers() ? "text-green-600" : "text-slate-700"}`}>
-                        {plan.maxMembers}
-                        {plan.maxMembers === getBestMembers() && (
-                          <CheckCircle size={14} className="text-green-500" title="Most members" />
-                        )}
-                      </span>
-                    </td>
-                  ))}
-                </tr>
-
-                {/* Duration */}
-                <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <td className="px-5 py-3 text-slate-500 font-medium">Duration</td>
-                  {compareResults.map((plan) => (
-                    <td key={plan.planId} className="px-5 py-3 text-slate-700 font-semibold">
-                      {plan.policyDuration} yr
-                    </td>
-                  ))}
-                </tr>
-
-                {/* Value score = coverage / premium */}
-                <tr>
-                  <td className="px-5 py-3 text-slate-500 font-medium">
-                    Value Score
-                    <p className="text-xs text-slate-400 font-normal">Coverage ÷ Premium</p>
-                  </td>
-                  {compareResults.map((plan) => {
-                    const score = Math.round(plan.coverageAmount / plan.premiumAmount);
-                    const bestScore = Math.max(...compareResults.map((p) => Math.round(p.coverageAmount / p.premiumAmount)));
-                    return (
-                      <td key={plan.planId} className="px-5 py-3">
-                        <span className={`font-semibold flex items-center gap-1 ${score === bestScore ? "text-green-600" : "text-slate-700"}`}>
-                          {score}x
-                          {score === bestScore && (
-                            <CheckCircle size={14} className="text-green-500" title="Best value" />
-                          )}
-                        </span>
-                      </td>
-                    );
-                  })}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Legend */}
-          <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center gap-2">
-            <CheckCircle size={13} className="text-green-500" />
-            <span className="text-xs text-slate-400">= Best value in this row</span>
-          </div>
+                  {/* Purchase button */}
+                  <div className="p-6 pt-0 mt-auto">
+                    <button
+                      onClick={() => handlePurchase(plan)}
+                      disabled={purchasing === plan.planId}
+                      className="w-full py-2.5 rounded-full font-semibold text-sm transition-all duration-200 flex items-center justify-center"
+                      style={{
+                        background: isBest ? "#fff" : "transparent",
+                        color: isBest ? "#000" : "#fff",
+                        border: isBest ? "none" : "1px solid #333",
+                      }}
+                      onMouseEnter={e => {
+                        if (!isBest) {
+                          (e.currentTarget as HTMLButtonElement).style.borderColor = "#666";
+                        }
+                      }}
+                      onMouseLeave={e => {
+                        if (!isBest) {
+                          (e.currentTarget as HTMLButtonElement).style.borderColor = "#333";
+                        }
+                      }}
+                    >
+                      {purchasing === plan.planId
+                        ? <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                        : "Select Plan"
+                      }
+                    </button>
+                  </div>
+                </SpotlightCard>
+              </motion.div>
+            );
+          })}
         </div>
       )}
-    </div>
-  );
-};
 
-export default BrowsePlans;
+      {/* AI Advisor widget */}
+      <AnimatePresence>
+        {showAdvisor && <PolicyAdvisorWidget onClose={() => setShowAdvisor(false)} />}
+      </AnimatePresence>
+    </motion.div>
+  );
+}

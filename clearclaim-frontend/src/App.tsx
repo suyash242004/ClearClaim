@@ -1,23 +1,12 @@
-// function App() {
-//   return (
-//     <div className="min-h-screen bg-blue-700 flex items-center justify-center">
-//       <h1 className="text-white text-4xl font-bold">ClearClaim</h1>
-//     </div>
-//   );
-// }
-
-// export default App;
-
-// App.tsx
-// Root component of ClearClaim application
-// Sets up React Router with all page routes
-// Protected routing based on Redux auth state (role)
-
+// App.tsx — BrowserRouter wraps everything so Login can call navigate()
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import type { RootState } from "./store/store";
+import { motion } from "framer-motion";
 import Login from "./pages/Login";
+import Landing from "./pages/Landing";
 import DbExplorer from "./pages/DbExplorer";
+import Docs from "./pages/Docs";
 
 // Customer pages
 import CustomerDashboard from "./pages/customer/CustomerDashboard";
@@ -38,76 +27,77 @@ import ManageData from "./pages/admin/ManageData";
 import HospitalClaims from "./pages/hospital/HospitalClaims";
 
 import Navbar from "./components/Navbar";
-import Sidebar from "./components/Sidebar";
 
-function App() {
-  // Read current auth state from Redux store
+// Page wrapper with fade transition
+const Page = ({ children }: { children: React.ReactNode }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 8 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.3 }}
+  >
+    {children}
+  </motion.div>
+);
+
+function AppRoutes() {
   const { isLoggedIn, role } = useSelector((state: RootState) => state.auth);
 
-  // If not logged in — show only Login page
-  if (!isLoggedIn) {
+  const isValidRole = role === "admin" || role === "customer" || role === "hospital";
+
+  if (!isLoggedIn || !role || !isValidRole) {
     return (
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/db-explorer" element={<DbExplorer />} />
-          {/* Any other URL after logout → redirect to Login */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <Routes>
+        <Route path="/landing" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<Navigate to="/landing" replace />} />
+        <Route path="/docs" element={<Docs />} />
+        <Route path="*" element={<Navigate to="/landing" replace />} />
+      </Routes>
     );
   }
 
-  // If logged in — show layout with Navbar + Sidebar + Pages
+  return (
+    <div className="min-h-screen flex flex-col" style={{ background: "#050810" }}>
+      <Navbar />
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 overflow-auto">
+        <Routes>
+          {role === "customer" && (
+            <>
+              <Route path="/" element={<Page><CustomerDashboard /></Page>} />
+              <Route path="/browse-plans" element={<Page><BrowsePlans /></Page>} />
+              <Route path="/purchase-policy" element={<Page><PurchasePolicy /></Page>} />
+              <Route path="/my-policies" element={<Page><MyPolicies /></Page>} />
+              <Route path="/submit-claim" element={<Page><SubmitClaim /></Page>} />
+              <Route path="/my-claims" element={<Page><MyClaims /></Page>} />
+              <Route path="/family-members" element={<Page><FamilyMembers /></Page>} />
+            </>
+          )}
+          {role === "admin" && (
+            <>
+              <Route path="/" element={<Page><AdminDashboard /></Page>} />
+              <Route path="/pending-claims" element={<Page><PendingClaims /></Page>} />
+              <Route path="/customer-search" element={<Page><CustomerSearch /></Page>} />
+              <Route path="/manage-data" element={<Page><ManageData /></Page>} />
+              <Route path="/db-explorer" element={<Page><DbExplorer /></Page>} />
+            </>
+          )}
+          {role === "hospital" && (
+            <>
+              <Route path="/" element={<Page><HospitalClaims /></Page>} />
+            </>
+          )}
+          <Route path="/docs" element={<Page><Docs /></Page>} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-slate-50 flex flex-col">
-        {/* Top navigation bar */}
-        <Navbar />
-
-        <div className="flex flex-1">
-          {/* Side navigation bar */}
-          <Sidebar />
-
-          {/* Main content area */}
-          <main className="flex-1 p-6">
-            <Routes>
-              {/* Customer Routes */}
-              {role === "customer" && (
-                <>
-                  <Route path="/" element={<CustomerDashboard />} />
-                  <Route path="/browse-plans" element={<BrowsePlans />} />
-                  <Route path="/purchase-policy" element={<PurchasePolicy />} />
-                  <Route path="/my-policies" element={<MyPolicies />} />
-                  <Route path="/submit-claim" element={<SubmitClaim />} />
-                  <Route path="/my-claims" element={<MyClaims />} />
-                  <Route path="/family-members" element={<FamilyMembers />} />
-                </>
-              )}
-
-              {/* Admin Routes */}
-              {role === "admin" && (
-                <>
-                  <Route path="/" element={<AdminDashboard />} />
-                  <Route path="/pending-claims" element={<PendingClaims />} />
-                  <Route path="/customer-search" element={<CustomerSearch />} />
-                  <Route path="/manage-data" element={<ManageData />} />
-                </>
-              )}
-
-              {/* Hospital Routes */}
-              {role === "hospital" && (
-                <>
-                  <Route path="/" element={<HospitalClaims />} />
-                </>
-              )}
-
-              {/* Fallback */}
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
-          </main>
-        </div>
-      </div>
+      <AppRoutes />
     </BrowserRouter>
   );
 }

@@ -1,168 +1,409 @@
-// PendingClaims.tsx
-// Admin can view all pending claims and approve or reject them
-// GET /api/admin/claims/pending
-// PUT /api/admin/claims/approve/:id
-// PUT /api/admin/claims/reject/:id
-
+// PendingClaims.tsx — Full dark table with AI reasoning drawer + floating FAB
 import { useEffect, useState } from "react";
-import ClaimHttpService from "../../services/ClaimHttpService";
-import type { Claim } from "../../models/Claim";
-import { CheckSquare, XSquare, ClipboardList } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { readApi, writeApi } from "../../services/axiosConfig";
+import { AgentHttpService, type ClaimDecision } from "../../services/AgentHttpService";
+import ClaimStatusChip from "../../components/ClaimStatusChip";
+import FraudScoreBadge from "../../components/FraudScoreBadge";
+import TxHashLink from "../../components/TxHashLink";
+import GhastButton from "../../components/GhastButton";
+import {
+  Bot, ChevronDown, ChevronUp, Check, X,
+  AlertTriangle, Brain, Shield, RefreshCw, Play
+} from "lucide-react";
 
-const PendingClaims = () => {
+interface Claim {
+  claimId: number;
+  policyId: number;
+  hospitalId: number;
+  claimDate: string;
+  claimAmount: number;
+  disease: string;
+  status: string;
+  doctorName: string;
+  description: string;
+  fraudScore?: number | null;
+  aiDecision?: string | null;
+  aiReasoning?: string | null;
+  aiConfidence?: number | null;
+  txHash?: string | null;
+}
+
+export default function PendingClaims() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [actionMessage, setActionMessage] = useState("");
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [agentRunning, setAgentRunning] = useState(false);
+  const [agentResults, setAgentResults] = useState<Record<number, ClaimDecision>>({});
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [successMsg, setSuccessMsg] = useState("");
 
-  // Fetch pending claims on mount
-  const fetchPendingClaims = async () => {
+  const load = async () => {
+    setLoading(true);
     try {
-      const res = await ClaimHttpService.getPending();
-      setClaims(res.records ?? []);
-    } catch {
-      setError("Failed to load pending claims.");
+      // Use with-ai endpoint to get persisted AI columns (fraud_score, ai_decision, tx_hash)
+      // Falls back to pending-only if the endpoint is unavailable
+      const res = await readApi.get("/api/admin/claims/with-ai").catch(
+        () => readApi.get("/api/admin/claims/pending")
+      );
+      setClaims(res.data?.records ?? []);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchPendingClaims();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  // Approve a claim
-  const handleApprove = async (claimId: number) => {
+  const runAgent = async () => {
+    setAgentRunning(true);
     try {
-      const res = await ClaimHttpService.approve(claimId);
-      setActionMessage(res.message);
-      // Refresh list after action
-      fetchPendingClaims();
-    } catch (err: any) {
-      const errMsg = err.response?.data?.errorMessage || (typeof err.response?.data === 'string' ? err.response.data : "Approve failed.");
-      setActionMessage(errMsg);
+      const { data } = await AgentHttpService.processClaims();
+      const map: Record<number, ClaimDecision> = {};
+      data.forEach(d => { map[d.claim_id] = d; });
+      setAgentResults(map);
+      
+      const approvedCount = data.filter(d => d.decision === "Approve").length;
+      const rejectedCount = data.filter(d => d.decision === "Reject").length;
+      setSuccessMsg(`AI processed ${data.length} claims (Approved: ${approvedCount}, Rejected: ${rejectedCount}). Check Admin Dashboard for detailed logs.`);
+      
+      await load();
+    } catch {
+      alert("Agent offline. Ensure Python agent is running on port 8000.");
+    } finally {
+      setAgentRunning(false);
     }
   };
 
-  // Reject a claim
-  const handleReject = async (claimId: number) => {
+  const manualAction = async (claimId: number, action: "approve" | "reject") => {
+    setActionLoading(claimId);
     try {
-      const res = await ClaimHttpService.reject(claimId);
-      setActionMessage(res.message);
-      // Refresh list after action
-      fetchPendingClaims();
-    } catch (err: any) {
-      const errMsg = err.response?.data?.errorMessage || (typeof err.response?.data === 'string' ? err.response.data : "Reject failed.");
-      setActionMessage(errMsg);
+      await writeApi.put(`/api/admin/claims/${action}/${claimId}`);
+      await load();
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  if (loading) return <div className="text-slate-500 text-sm">Loading...</div>;
+  const getDecision = (claim: Claim): ClaimDecision | null =>
+    agentResults[claim.claimId] ?? null;
+
+  // Merged AI decision: runtime result takes precedence, then DB value
+  const getAiDecision = (claim: Claim) => {
+    const rt = agentResults[claim.claimId];
+    return rt ? rt.decision : (claim.aiDecision ?? null);
+  };
+
+  const getAiReasoning = (claim: Claim) => {
+    const rt = agentResults[claim.claimId];
+    return rt ? rt.reasoning : (claim.aiReasoning ?? null);
+  };
+
+  const getConfidence = (claim: Claim) => {
+    const rt = agentResults[claim.claimId];
+    return rt ? rt.confidence_score : (claim.aiConfidence ? Number(claim.aiConfidence) : null);
+  };
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-slate-800 mb-1">
-        Pending Claims
-      </h2>
-      <p className="text-slate-500 text-sm mb-6">
-        Review and approve or reject pending insurance claims.
-      </p>
-
-      {/* Action feedback message */}
-      {actionMessage && (
-        <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-4 py-3 rounded-lg mb-4">
-          {actionMessage}
-        </div>
-      )}
-
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-
-      {claims.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-          <ClipboardList className="mx-auto text-slate-300 mb-2" size={36} />
-          <p className="text-slate-400 text-sm">
-            No pending claims at the moment.
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="space-y-5"
+    >
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold" style={{ color: "#F8FAFC" }}>Pending Claims</h1>
+          <p className="text-sm mt-0.5" style={{ color: "#475569" }}>
+            {claims.length} claim{claims.length !== 1 ? "s" : ""} awaiting review
           </p>
         </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Claim ID
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Policy ID
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Hospital ID
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Disease
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Amount (₹)
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Doctor
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Date
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {claims.map((claim) => (
-                <tr
-                  key={claim.claimId}
-                  className="border-b border-slate-100 hover:bg-slate-50"
-                >
-                  <td className="px-4 py-3 text-slate-700">{claim.claimId}</td>
-                  <td className="px-4 py-3 text-slate-700">{claim.policyId}</td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {claim.hospitalId}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{claim.disease}</td>
-                  <td className="px-4 py-3 text-slate-700">
-                    ₹{claim.claimAmount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {claim.doctorName}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {claim.claimDate}
-                  </td>
-                  <td className="px-4 py-3 flex gap-2">
-                    {/* Approve Button */}
-                    <button
-                      onClick={() => handleApprove(claim.claimId)}
-                      className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded-lg transition-colors"
-                    >
-                      <CheckSquare size={14} />
-                      Approve
-                    </button>
+        <button
+          onClick={load}
+          disabled={loading}
+          className="btn-ghost flex items-center gap-1.5 text-xs"
+        >
+          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+          Refresh
+        </button>
+      </div>
 
-                    {/* Reject Button */}
-                    <button
-                      onClick={() => handleReject(claim.claimId)}
-                      className="flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded-lg transition-colors"
-                    >
-                      <XSquare size={14} />
-                      Reject
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {successMsg && (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm px-4 py-3 rounded-lg flex items-center justify-between">
+          <span>{successMsg}</span>
+          <button onClick={() => setSuccessMsg("")} className="hover:text-emerald-300">
+            <X size={14} />
+          </button>
         </div>
       )}
-    </div>
-  );
-};
 
-export default PendingClaims;
+      {/* ── Table card ── */}
+      <div className="card overflow-hidden">
+        {loading ? (
+          <div className="p-12 text-center">
+            <span className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin inline-block" />
+            <p className="text-sm mt-3" style={{ color: "#475569" }}>Loading claims…</p>
+          </div>
+        ) : claims.length === 0 ? (
+          <div className="p-16 text-center">
+            <Check size={32} style={{ color: "#34D399" }} className="mx-auto mb-3" />
+            <p className="font-medium" style={{ color: "#F8FAFC" }}>No pending claims</p>
+            <p className="text-sm mt-1" style={{ color: "#475569" }}>All claims have been processed.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="table-dark w-full">
+              <thead>
+                <tr>
+                  <th>Claim ID</th>
+                  <th>Disease</th>
+                  <th className="text-right">Amount</th>
+                  <th>Policy</th>
+                  <th>Fraud Score</th>
+                  <th>AI Decision</th>
+                  <th>Status</th>
+                  <th>Tx Hash</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {claims.map(claim => {
+                  const decision = getDecision(claim);
+                  const aiDec    = getAiDecision(claim);
+                  const isOpen   = expanded === claim.claimId;
+                  const conf     = getConfidence(claim);
+                  const confPct  = conf != null ? Math.round(conf * 100) : null;
+
+                  return (
+                    <>
+                      <tr
+                        key={claim.claimId}
+                        className="cursor-pointer group"
+                        onClick={() => setExpanded(isOpen ? null : claim.claimId)}
+                        style={{ height: "48px" }}
+                      >
+                        {/* Claim ID */}
+                        <td className="relative">
+                          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <span className="font-mono font-bold text-sm ml-2" style={{ color: "#6366F1" }}>
+                            #{claim.claimId}
+                          </span>
+                        </td>
+
+                        {/* Disease */}
+                        <td>
+                          <span className="font-medium text-xs" style={{ color: "#F8FAFC" }}>
+                            {claim.disease}
+                          </span>
+                        </td>
+
+                        {/* Amount */}
+                        <td className="text-right">
+                          <span className="font-bold text-sm" style={{ color: "#fff" }}>
+                            ₹{Number(claim.claimAmount).toLocaleString("en-IN")}
+                          </span>
+                        </td>
+
+                        {/* Policy */}
+                        <td>
+                          <span className="text-xs font-mono" style={{ color: "#475569" }}>
+                            P-{claim.policyId}
+                          </span>
+                        </td>
+
+                        {/* Fraud Score */}
+                        <td>
+                          <FraudScoreBadge score={claim.fraudScore} />
+                        </td>
+
+                        {/* AI Decision */}
+                        <td>
+                          {aiDec
+                            ? <ClaimStatusChip status={aiDec} />
+                            : <span className="text-xs" style={{ color: "#1E293B" }}>—</span>
+                          }
+                        </td>
+
+                        {/* DB Status */}
+                        <td>
+                          <ClaimStatusChip status={claim.status} />
+                        </td>
+
+                        {/* Tx Hash */}
+                        <td onClick={e => e.stopPropagation()}>
+                          <TxHashLink hash={claim.txHash} />
+                        </td>
+
+                        {/* Actions */}
+                        <td>
+                          <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                            <button
+                              onClick={() => manualAction(claim.claimId, "approve")}
+                              disabled={actionLoading === claim.claimId}
+                              className="p-1.5 rounded-lg transition-colors"
+                              style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}
+                              title="Approve"
+                            >
+                              <Check size={12} style={{ color: "#34D399" }} />
+                            </button>
+                            <button
+                              onClick={() => manualAction(claim.claimId, "reject")}
+                              disabled={actionLoading === claim.claimId}
+                              className="p-1.5 rounded-lg transition-colors"
+                              style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}
+                              title="Reject"
+                            >
+                              <X size={12} style={{ color: "#F87171" }} />
+                            </button>
+                            {isOpen
+                              ? <ChevronUp  size={13} style={{ color: "#475569" }} />
+                              : <ChevronDown size={13} style={{ color: "#475569" }} />
+                            }
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* ── Expandable AI reasoning drawer ── */}
+                      <AnimatePresence>
+                        {isOpen && (
+                          <tr key={`${claim.claimId}-detail`}>
+                            <td colSpan={9} style={{ padding: 0 }}>
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.22 }}
+                                className="overflow-hidden"
+                              >
+                                <div
+                                  className="m-3 p-5 rounded-xl space-y-4"
+                                  style={{
+                                    background: "#020408",
+                                    border: "1px solid rgba(255,255,255,0.06)",
+                                  }}
+                                >
+                                  {/* Claim description */}
+                                  <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#334155" }}>
+                                      Claim Description
+                                    </p>
+                                    <p className="text-sm leading-relaxed" style={{ color: "#94A3B8" }}>
+                                      {claim.description || "No description provided."}
+                                    </p>
+                                  </div>
+
+                                    {getAiReasoning(claim) && (
+                                      <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Brain size={13} style={{ color: "#6366F1" }} />
+                                          <p className="text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: "#64748B" }}>
+                                            AI Reasoning
+                                          </p>
+                                          {confPct != null && (
+                                            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.12)", color: "#6366F1" }}>
+                                              {confPct}% confident
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-sm leading-relaxed mb-4" style={{ color: "#888899" }}>
+                                          {getAiReasoning(claim)}
+                                        </p>
+                                        {/* Confidence bar */}
+                                        {confPct != null && (
+                                          <div className="space-y-1.5 max-w-md">
+                                            <div className="flex justify-between text-xs font-medium uppercase tracking-wider" style={{ color: "#64748B" }}>
+                                              <span>Confidence</span>
+                                              <span>{confPct}%</span>
+                                            </div>
+                                            <div className="w-full h-1.5 rounded-full" style={{ background: "#222" }}>
+                                              <motion.div
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${confPct}%` }}
+                                                transition={{ duration: 0.6, ease: "easeOut" }}
+                                                className="h-full rounded-full"
+                                                style={{ background: "#6366F1" }}
+                                              />
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                  {/* Fraud indicators */}
+                                  {decision && decision.fraud_indicators.length > 0 && (
+                                    <div>
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <AlertTriangle size={13} style={{ color: "#FBBF24" }} />
+                                        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#334155" }}>
+                                          Fraud Indicators
+                                        </p>
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        {decision.fraud_indicators.map((ind, i) => (
+                                          <div key={i} className="flex items-start gap-2">
+                                            <span className="text-xs mt-0.5" style={{ color: "#F87171" }}>⚠</span>
+                                            <span className="text-xs" style={{ color: "#FBBF24" }}>{ind}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Blockchain proof */}
+                                  {claim.txHash && (
+                                    <div>
+                                      <div className="flex items-center gap-2 mb-1.5">
+                                        <Shield size={13} style={{ color: "#10B981" }} />
+                                        <p className="text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: "#64748B" }}>
+                                          Blockchain Proof
+                                        </p>
+                                      </div>
+                                      <a
+                                        href={`https://www.okx.com/web3/explorer/xlayer/test/tx/${claim.txHash}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-xs font-medium hover:underline inline-flex items-center gap-1"
+                                        style={{ color: "#10B981" }}
+                                      >
+                                        verify on chain ✓
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              </motion.div>
+                            </td>
+                          </tr>
+                        )}
+                      </AnimatePresence>
+                    </>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Floating Run AI Agent FAB ── */}
+      <motion.div
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+        className="fixed bottom-8 right-8 z-40"
+      >
+        <GhastButton
+          onClick={runAgent}
+          disabled={agentRunning}
+          variant="light"
+          className="shadow-2xl px-6 py-3.5 text-base gap-3"
+        >
+          {agentRunning ? (
+            <span className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+          ) : (
+            <Play size={16} fill="currentColor" />
+          )}
+          {agentRunning ? "AI Running…" : "Run AI Agent"}
+        </GhastButton>
+      </motion.div>
+    </motion.div>
+  );
+}

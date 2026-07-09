@@ -1,253 +1,169 @@
-// HospitalClaims.tsx
-// First (and only) page the hospital role sees after login
-// Shows all claims submitted at this hospital
-// Allows filtering by status — All / Pending / Approved / Rejected
-// Uses HospitalHttpService — GET /api/hospital/{id}/claims
-//                          — GET /api/hospital/{id}/claims/{status}
-
+// HospitalClaims.tsx — Hospital dashboard showing assigned claims
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { useSelector } from "react-redux";
+import { readApi } from "../../services/axiosConfig";
 import type { RootState } from "../../store/store";
-import HospitalHttpService from "../../services/HospitalHttpService";
-import type { Claim } from "../../models/Claim";
-import { ClipboardList, IndianRupee, CheckSquare, Clock, XSquare } from "lucide-react";
+import ClaimStatusChip from "../../components/ClaimStatusChip";
+import TxHashLink from "../../components/TxHashLink";
+import { Building2, ClipboardList, ShieldCheck, CheckCircle, Brain } from "lucide-react";
 
-// Status filter options
-type StatusFilter = "All" | "Pending" | "Approved" | "Rejected";
-
-const HospitalClaims = () => {
+export default function HospitalClaims() {
   const { userId } = useSelector((state: RootState) => state.auth);
-
-  const [claims, setClaims] = useState<Claim[]>([]);
+  const [claims, setClaims] = useState<any[]>([]);
+  const [hospital, setHospital] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [activeFilter, setActiveFilter] = useState<StatusFilter>("All");
 
-  // Fetch claims — all or by status depending on active filter
-  const fetchClaims = async (filter: StatusFilter) => {
-    setLoading(true);
-    setError("");
-    setClaims([]); // clear stale data from previous filter
-    try {
-      let res;
-      if (filter === "All") {
-        res = await HospitalHttpService.getClaims(userId!);
-      } else {
-        res = await HospitalHttpService.getClaimsByStatus(userId!, filter);
-      }
-      setClaims(res.records ?? []); // safely handle null records from backend
-    } catch {
-      setError("Failed to load claims.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch on mount and whenever filter changes
   useEffect(() => {
-    fetchClaims(activeFilter);
-  }, [activeFilter, userId]);
+    const load = async () => {
+      try {
+        const [hospRes, claimsRes] = await Promise.all([
+          readApi.get(`/api/HospitalRead/${userId}`),
+          readApi.get(`/api/HospitalRead/${userId}/claims`),
+        ]);
+        setHospital(hospRes.data?.record);
+        setClaims(claimsRes.data?.records ?? []);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [userId]);
 
-  // Status badge color — same helper as MyClaims
-  const statusColor = (status?: string) => {
-    if (status === "Approved") return "bg-green-100 text-green-700";
-    if (status === "Rejected") return "bg-red-100 text-red-700";
-    return "bg-amber-100 text-amber-700";
+  const totalClaims    = claims.length;
+  const pendingClaims  = claims.filter(c => c.status === "Pending").length;
+  const approvedClaims = claims.filter(c => c.status === "Approved").length;
+
+  const formatDate = (dateStr: any) => {
+    if (!dateStr) return "—";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("en-IN");
   };
-
-  // Derive stat counts from ALL loaded claims for summary cards
-  // (only meaningful when filter = "All", otherwise just shows filtered count)
-  const totalClaims = claims.length;
-  const pendingCount = claims.filter((c) => c.status === "Pending").length;
-  const approvedCount = claims.filter((c) => c.status === "Approved").length;
-  const rejectedCount = claims.filter((c) => c.status === "Rejected").length;
-
-  // Filter tab config
-  const filters: { key: StatusFilter; label: string }[] = [
-    { key: "All", label: "All" },
-    { key: "Pending", label: "Pending" },
-    { key: "Approved", label: "Approved" },
-    { key: "Rejected", label: "Rejected" },
-  ];
 
   return (
-    <div>
-      {/* Page Header */}
-      <h2 className="text-xl font-semibold text-slate-800 mb-1">
-        Hospital Claims
-      </h2>
-      <p className="text-slate-500 text-sm mb-6">
-        View all insurance claims submitted at your hospital.
-      </p>
-
-      {/* Stat Cards — only meaningful on "All" filter */}
-      {activeFilter === "All" && !loading && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          {/* Total */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4">
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <ClipboardList className="text-blue-700" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-800">{totalClaims}</p>
-              <p className="text-sm text-slate-500">Total Claims</p>
-            </div>
-          </div>
-
-          {/* Pending */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4">
-            <div className="bg-amber-50 p-3 rounded-lg">
-              <Clock className="text-amber-600" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-800">{pendingCount}</p>
-              <p className="text-sm text-slate-500">Pending</p>
-            </div>
-          </div>
-
-          {/* Approved */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4">
-            <div className="bg-green-50 p-3 rounded-lg">
-              <CheckSquare className="text-green-600" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-800">
-                {approvedCount}
-              </p>
-              <p className="text-sm text-slate-500">Approved</p>
-            </div>
-          </div>
-
-          {/* Rejected */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4">
-            <div className="bg-red-50 p-3 rounded-lg">
-              <XSquare className="text-red-600" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-800">
-                {rejectedCount}
-              </p>
-              <p className="text-sm text-slate-500">Rejected</p>
-            </div>
-          </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35 }}
+      className="space-y-6"
+    >
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-lg font-bold" style={{ color: "#F8FAFC" }}>
+            {hospital?.hospitalName ?? `Hospital #${userId}`}
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: "#475569" }}>
+            {hospital?.city ?? "Hospital Portal"} · Claims Dashboard
+          </p>
         </div>
-      )}
+        <div
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+          style={{ background: "rgba(16,185,129,0.1)", color: "#34D399", border: "1px solid rgba(16,185,129,0.2)" }}
+        >
+          <ShieldCheck size={13} /> ClearClaim Verified Partner
+        </div>
+      </div>
 
-      {/* Status Filter Tabs */}
-      <div className="flex gap-2 mb-6">
-        {filters.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setActiveFilter(f.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
-              ${
-                activeFilter === f.key
-                  ? "bg-blue-700 text-white"
-                  : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-50"
-              }`}
+      {/* ── Stats row ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { label: "Total Claims",   value: totalClaims,    icon: ClipboardList, color: "#60A5FA" },
+          { label: "Pending Review", value: pendingClaims,  icon: Building2,     color: "#FBBF24" },
+          { label: "Approved",       value: approvedClaims, icon: CheckCircle,   color: "#34D399" },
+        ].map(({ label, value, icon: Icon, color }, i) => (
+          <motion.div
+            key={label}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.07 }}
+            className="card p-5 flex items-center gap-4"
           >
-            {f.label}
-          </button>
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: `${color}14`, border: `1px solid ${color}22` }}
+            >
+              <Icon size={20} style={{ color }} />
+            </div>
+            <div>
+              <p className="text-xs font-medium" style={{ color: "#475569" }}>{label}</p>
+              <p className="text-2xl font-bold mt-0.5" style={{ color }}>{value}</p>
+            </div>
+          </motion.div>
         ))}
       </div>
 
-      {/* Error */}
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-
-      {/* Loading */}
-      {loading ? (
-        <div className="text-slate-500 text-sm">Loading...</div>
-      ) : claims.length === 0 ? (
-        /* Empty State */
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-          <ClipboardList className="mx-auto text-slate-300 mb-2" size={36} />
-          <p className="text-slate-400 text-sm">
-            No {activeFilter !== "All" ? activeFilter.toLowerCase() + " " : ""}
-            claims found.
-          </p>
-        </div>
-      ) : (
-        /* Claims Table */
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Claim ID
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Policy ID
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Disease
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Doctor
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Amount (₹)
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Date
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {claims.map((claim) => (
-                <tr
-                  key={claim.claimId}
-                  className="border-b border-slate-100 hover:bg-slate-50"
-                >
-                  <td className="px-4 py-3 text-slate-700 font-medium">
-                    #{claim.claimId}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{claim.policyId}</td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {claim.disease ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {claim.doctorName ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700 flex items-center gap-1">
-                    <IndianRupee size={13} className="text-slate-500" />
-                    {claim.claimAmount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{claim.claimDate}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(claim.status)}`}
-                    >
-                      {claim.status ?? "Pending"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Table footer — total amount for filtered view */}
-          <div className="px-4 py-3 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
-            <p className="text-xs text-slate-400">
-              Showing {claims.length} claim{claims.length !== 1 ? "s" : ""}
-              {activeFilter !== "All" ? ` · ${activeFilter}` : ""}
-            </p>
-            <p className="text-xs text-slate-600 font-medium">
-              Total:{" "}
-              <span className="text-slate-800 font-semibold">
-                ₹
-                {claims
-                  .reduce((sum, c) => sum + c.claimAmount, 0)
-                  .toLocaleString()}
-              </span>
-            </p>
+      {/* ── Claims table ── */}
+      <div className="card overflow-hidden">
+        {loading ? (
+          <div className="p-10 text-center">
+            <span className="w-6 h-6 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin inline-block" />
           </div>
-        </div>
-      )}
-    </div>
+        ) : claims.length === 0 ? (
+          <div className="p-14 text-center">
+            <ClipboardList size={28} style={{ color: "#1E293B" }} className="mx-auto mb-3" />
+            <p className="text-sm font-medium" style={{ color: "#F8FAFC" }}>No claims yet</p>
+            <p className="text-xs mt-1" style={{ color: "#475569" }}>Claims assigned to this hospital will appear here.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="table-dark w-full">
+              <thead>
+                <tr>
+                  <th>Claim ID</th>
+                  <th>Date</th>
+                  <th>Disease</th>
+                  <th className="text-right">Amount (₹)</th>
+                  <th>AI Verified</th>
+                  <th>Status</th>
+                  <th>Tx Hash</th>
+                </tr>
+              </thead>
+              <tbody>
+                {claims.map((claim) => (
+                  <tr key={claim.claimId}>
+                    <td>
+                      <span className="font-mono font-bold text-xs" style={{ color: "#60A5FA" }}>
+                        #{claim.claimId}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="text-xs" style={{ color: "#64748B" }}>
+                        {formatDate(claim.claimDate)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="text-xs font-medium" style={{ color: "#F8FAFC" }}>
+                        {claim.disease}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <span className="text-xs font-semibold" style={{ color: "#CBD5E1" }}>
+                        ₹{Number(claim.claimAmount).toLocaleString("en-IN")}
+                      </span>
+                    </td>
+                    <td>
+                      {claim.aiDecision ? (
+                        <div className="flex items-center gap-1.5">
+                          <Brain size={11} style={{ color: "#60A5FA" }} />
+                          <ClaimStatusChip status={claim.aiDecision} />
+                        </div>
+                      ) : (
+                        <span className="text-xs" style={{ color: "#1E293B" }}>—</span>
+                      )}
+                    </td>
+                    <td><ClaimStatusChip status={claim.status} /></td>
+                    <td><TxHashLink hash={claim.txHash} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
-};
-
-export default HospitalClaims;
+}
