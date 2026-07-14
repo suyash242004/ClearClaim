@@ -1,5 +1,5 @@
 // PendingClaims.tsx — Full dark table with AI reasoning drawer + floating FAB
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { readApi, writeApi } from "../../services/axiosConfig";
 import { AgentHttpService, type ClaimDecision } from "../../services/AgentHttpService";
@@ -9,8 +9,9 @@ import TxHashLink from "../../components/TxHashLink";
 import GhastButton from "../../components/GhastButton";
 import {
   Bot, ChevronDown, ChevronUp, Check, X,
-  AlertTriangle, Brain, Shield, RefreshCw, Play
+  AlertTriangle, Brain, Shield, RefreshCw, Play, History, GitBranch
 } from "lucide-react";
+import DecisionReplayModal from "../../components/DecisionReplayModal";
 
 interface Claim {
   claimId: number;
@@ -37,9 +38,30 @@ export default function PendingClaims() {
   const [agentResults, setAgentResults] = useState<Record<number, ClaimDecision>>({});
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [replayClaim, setReplayClaim] = useState<number | null>(null);
+  const [graphRunning, setGraphRunning] = useState<number | null>(null);
+
+  const runGraphOnClaim = async (claimId: number) => {
+    setGraphRunning(claimId);
+    try {
+      const { data } = await AgentHttpService.runGraph(claimId);
+      setSuccessMsg(
+        data.is_paused
+          ? `Claim #${claimId} paused for human review — see the Review Queue.`
+          : `LangGraph decided: ${data.ai_decision} (${Math.round((data.confidence ?? 0) * 100)}% confidence).`
+      );
+      await load();
+    } catch {
+      setSuccessMsg(`LangGraph run failed for claim #${claimId} — is the agent gateway running?`);
+    } finally {
+      setGraphRunning(null);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
+    setLoadError("");
     try {
       // Use with-ai endpoint to get persisted AI columns (fraud_score, ai_decision, tx_hash)
       // Falls back to pending-only if the endpoint is unavailable
@@ -47,6 +69,9 @@ export default function PendingClaims() {
         () => readApi.get("/api/admin/claims/pending")
       );
       setClaims(res.data?.records ?? []);
+    } catch {
+      setClaims([]);
+      setLoadError("Could not load claims — is the ReadAPI running on port 5234?");
     } finally {
       setLoading(false);
     }
@@ -68,7 +93,7 @@ export default function PendingClaims() {
       
       await load();
     } catch {
-      alert("Agent offline. Ensure Python agent is running on port 8000.");
+      setSuccessMsg("AI agent unreachable — is the Python agent gateway running on port 8000?");
     } finally {
       setAgentRunning(false);
     }
@@ -78,7 +103,13 @@ export default function PendingClaims() {
     setActionLoading(claimId);
     try {
       await writeApi.put(`/api/admin/claims/${action}/${claimId}`);
+      setSuccessMsg(`Claim #${claimId} ${action === "approve" ? "approved" : "rejected"} successfully.`);
       await load();
+    } catch (e: any) {
+      const msg = e?.response?.data?.errorMessage ||
+        (typeof e?.response?.data === "string" ? e.response.data : null) ||
+        `Failed to ${action} claim #${claimId}. Please try again.`;
+      setSuccessMsg(msg);
     } finally {
       setActionLoading(null);
     }
@@ -114,7 +145,7 @@ export default function PendingClaims() {
         <div>
           <h1 className="text-lg font-bold" style={{ color: "#F8FAFC" }}>Pending Claims</h1>
           <p className="text-sm mt-0.5" style={{ color: "#475569" }}>
-            {claims.length} claim{claims.length !== 1 ? "s" : ""} awaiting review
+            {claims.filter(c => c.status === "Pending").length} awaiting review · {claims.length} total
           </p>
         </div>
         <button
@@ -132,6 +163,15 @@ export default function PendingClaims() {
           <span>{successMsg}</span>
           <button onClick={() => setSuccessMsg("")} className="hover:text-emerald-300">
             <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {loadError && (
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-4 py-3 rounded-lg flex items-center justify-between">
+          <span>{loadError}</span>
+          <button onClick={load} className="text-xs font-semibold hover:text-red-300 underline">
+            Retry
           </button>
         </div>
       )}
@@ -174,9 +214,8 @@ export default function PendingClaims() {
                   const confPct  = conf != null ? Math.round(conf * 100) : null;
 
                   return (
-                    <>
+                    <Fragment key={claim.claimId}>
                       <tr
-                        key={claim.claimId}
                         className="cursor-pointer group"
                         onClick={() => setExpanded(isOpen ? null : claim.claimId)}
                         style={{ height: "48px" }}
@@ -236,6 +275,26 @@ export default function PendingClaims() {
                         {/* Actions */}
                         <td>
                           <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                            <button
+                              onClick={() => runGraphOnClaim(claim.claimId)}
+                              disabled={graphRunning === claim.claimId}
+                              className="p-1.5 rounded-lg transition-colors"
+                              style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.25)" }}
+                              title="Run LangGraph pipeline (checkpointed)"
+                            >
+                              {graphRunning === claim.claimId
+                                ? <RefreshCw size={12} className="animate-spin" style={{ color: "#A5B4FC" }} />
+                                : <GitBranch size={12} style={{ color: "#A5B4FC" }} />
+                              }
+                            </button>
+                            <button
+                              onClick={() => setReplayClaim(claim.claimId)}
+                              className="p-1.5 rounded-lg transition-colors"
+                              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+                              title="Replay AI Decision (flight recorder)"
+                            >
+                              <History size={12} style={{ color: "#94A3B8" }} />
+                            </button>
                             <button
                               onClick={() => manualAction(claim.claimId, "approve")}
                               disabled={actionLoading === claim.claimId}
@@ -374,7 +433,7 @@ export default function PendingClaims() {
                           </tr>
                         )}
                       </AnimatePresence>
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -404,6 +463,10 @@ export default function PendingClaims() {
           {agentRunning ? "AI Running…" : "Run AI Agent"}
         </GhastButton>
       </motion.div>
+
+      {replayClaim != null && (
+        <DecisionReplayModal claimId={replayClaim} onClose={() => setReplayClaim(null)} />
+      )}
     </motion.div>
   );
 }

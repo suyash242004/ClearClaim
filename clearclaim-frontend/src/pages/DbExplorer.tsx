@@ -30,7 +30,7 @@ interface TableConfig {
   getById: (id: number) => Promise<any>;
   create: (d: any) => Promise<any>;
   update: (id: number, d: any) => Promise<any>;
-  remove: (id: number) => Promise<any>;
+  remove: (id: number, record?: any) => Promise<any>;
 }
 
 // ── Table Configurations ──────────────────────────────────────
@@ -137,6 +137,21 @@ const TABLES: TableConfig[] = [
     update: (id, d) => writeApi.put(`/api/FamilymemberWrite/${id}`, d).then(r => r.data),
     remove: (id) => writeApi.delete(`/api/FamilymemberWrite/${id}`).then(r => r.data),
   },
+  {
+    id: "planhospital", name: "Plan Hospital Link", icon: <Database size={15} />, primaryKey: "planId",
+    columns: [
+      { key: "planId", label: "Plan ID", type: "number" },
+      { key: "hospitalId", label: "Hospital ID", type: "number" },
+    ],
+    getAll: () => writeApi.get("/agent/plan-hospital", { baseURL: "http://localhost:8000" }).then(r => r.data),
+    getById: (id) => writeApi.get("/agent/plan-hospital", { baseURL: "http://localhost:8000" }).then(r => {
+       const rec = r.data.records?.find((x: any) => x.planId === id);
+       return { record: rec };
+    }),
+    create: (d) => writeApi.post("/agent/plan-hospital", d, { baseURL: "http://localhost:8000" }).then(r => r.data),
+    update: (id, d) => writeApi.post("/agent/plan-hospital", d, { baseURL: "http://localhost:8000" }).then(r => r.data),
+    remove: (id, record) => writeApi.delete(`/agent/plan-hospital/${record.planId}/${record.hospitalId}`, { baseURL: "http://localhost:8000" }).then(r => r.data),
+  },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -189,45 +204,48 @@ const RecordModal = ({
   const set = (key: string, val: any) => setForm(prev => ({ ...prev, [key]: val }));
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}>
+      <div className="w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl shadow-2xl" style={{ background: "#0A0F1C", border: "1px solid rgba(255,255,255,0.08)" }}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h3 className="font-semibold text-slate-800 text-base">
-            {mode === "add" ? "Add New" : "Edit"} {cfg.name}
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <h3 className="font-semibold text-base" style={{ color: "#F8FAFC" }}>
+            {mode === "add" ? "Add New" : "Edit"} <span className="font-serif-italic font-normal" style={{ color: "#818CF8" }}>{cfg.name}</span>
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X size={18} />
+          <button onClick={onClose} className="btn-ghost !p-1.5">
+            <X size={16} />
           </button>
         </div>
 
         {/* Fields */}
-        <div className="overflow-y-auto px-6 py-4 flex flex-col gap-4">
+        <div className="overflow-y-auto px-6 py-5 flex flex-col gap-4">
           {cfg.columns.map(col => (
             <div key={col.key}>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                {col.label}{col.readOnly && " (auto)"}
+              <label className="block text-xs font-medium uppercase tracking-wider mb-1.5" style={{ color: "#94A3B8" }}>
+                {col.label}{col.readOnly && <span style={{ color: "#475569" }}> (auto)</span>}
               </label>
               <FieldInput col={col} value={form[col.key]} onChange={v => set(col.key, v)} />
             </div>
           ))}
-          {error && <p className="text-red-500 text-xs">{error}</p>}
+          {error && (
+            <div className="text-xs px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.08)", color: "#F87171", border: "1px solid rgba(239,68,68,0.2)" }}>
+              {error}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 px-6 py-4 border-t border-slate-200">
+        <div className="flex gap-3 px-6 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           <button
             onClick={() => onSave(form)}
             disabled={saving}
-            className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm px-5 py-2 rounded-lg transition-colors disabled:opacity-50"
+            className="btn-ghast text-xs gap-2 px-5 py-2.5"
           >
-            <Save size={15} />
-            {saving ? "Saving..." : "Save"}
+            {saving
+              ? <span className="w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+              : <Save size={13} />}
+            {saving ? "Saving…" : "Save"}
           </button>
-          <button
-            onClick={onClose}
-            className="text-sm px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50"
-          >
+          <button onClick={onClose} className="btn-ghost">
             Cancel
           </button>
         </div>
@@ -299,9 +317,9 @@ const DbExplorer = () => {
     const pk = record[cfg.primaryKey];
     if (!confirm(`Delete ${cfg.name} ID ${pk}? This cannot be undone.`)) return;
     try {
-      await cfg.remove(pk);
-      setRecords(prev => prev.filter(r => r[cfg.primaryKey] !== pk));
-      showToast("success", `${cfg.name} #${pk} deleted.`);
+      await cfg.remove(pk, record);
+      setRecords(prev => prev.filter(r => r !== record));
+      showToast("success", `${cfg.name} deleted.`);
     } catch (e: any) {
       const errMsg = e.response?.data?.errorMessage || (typeof e.response?.data === 'string' ? e.response.data : "Delete failed.");
       showToast("error", errMsg);
@@ -348,62 +366,60 @@ const DbExplorer = () => {
   // Render cell value
   const renderCell = (col: ColDef, val: any) => {
     if (col.type === "boolean")
-      return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${val ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>{val ? "Yes" : "No"}</span>;
-    if (val === null || val === undefined) return <span className="text-slate-300">—</span>;
+      return (
+        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded"
+          style={val
+            ? { background: "rgba(16,185,129,0.1)", color: "#34D399", border: "1px solid rgba(16,185,129,0.2)" }
+            : { background: "rgba(255,255,255,0.06)", color: "#94A3B8", border: "1px solid rgba(255,255,255,0.1)" }}>
+          {val ? "Yes" : "No"}
+        </span>
+      );
+    if (val === null || val === undefined) return <span style={{ color: "#475569" }}>—</span>;
     return <span className="truncate max-w-[140px] block">{String(val)}</span>;
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Top Bar */}
-      <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate("/")}
-            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-sm transition-colors"
-          >
-            <ArrowLeft size={16} /> Back to Login
-          </button>
-          <span className="text-slate-300">|</span>
-          <div className="flex items-center gap-2">
-            <Database size={18} className="text-blue-700" />
-            <span className="font-bold text-slate-800">Database Explorer</span>
-            <span className="text-xs text-slate-400 ml-1">ClearClaim</span>
-          </div>
-        </div>
-        <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full font-medium">
-          ⚠ Direct DB access — use carefully
-        </span>
-      </header>
-
+    <div className="flex flex-col h-[calc(100vh-8rem)] rounded-2xl overflow-hidden border border-white/10" style={{ background: "#080C14" }}>
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar — Table list */}
-        <aside className="w-52 bg-white border-r border-slate-200 flex flex-col p-3 gap-1 shrink-0">
-          <p className="text-xs font-semibold text-slate-400 uppercase px-2 py-1 mb-1">Tables</p>
-          {TABLES.map((t, i) => (
-            <button
-              key={t.id}
-              onClick={() => { setTableIdx(i); setError(""); }}
-              className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left transition-colors ${
-                i === tableIdx
-                  ? "bg-blue-700 text-white font-medium"
-                  : "text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              {t.icon}
-              {t.name}
-            </button>
-          ))}
+        <aside className="w-52 flex flex-col p-3 gap-1 shrink-0" style={{
+          background: "#0A0F1C",
+          borderRight: "1px solid rgba(255,255,255,0.06)",
+        }}>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] px-2 py-1 mb-1" style={{ color: "#475569" }}>Tables</p>
+          {TABLES.map((t, i) => {
+            const active = i === tableIdx;
+            return (
+              <button
+                key={t.id}
+                onClick={() => { setTableIdx(i); setError(""); }}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left transition-all duration-200"
+                style={active ? {
+                  background: "rgba(99,102,241,0.12)",
+                  color: "#F8FAFC",
+                  border: "1px solid rgba(99,102,241,0.25)",
+                  fontWeight: 500,
+                } : {
+                  background: "transparent",
+                  color: "#94A3B8",
+                  border: "1px solid transparent",
+                }}
+              >
+                {t.icon}
+                {t.name}
+              </button>
+            );
+          })}
         </aside>
 
         {/* Main Panel */}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-6" style={{ background: "#050810" }}>
           {/* Panel Header */}
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+              <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: "#F8FAFC" }}>
                 {cfg.icon} {cfg.name}
-                <span className="text-xs font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                <span className="text-xs font-normal px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "#94A3B8" }}>
                   {records.length} record{records.length !== 1 ? "s" : ""}
                 </span>
               </h2>
@@ -418,18 +434,18 @@ const DbExplorer = () => {
                   value={searchId}
                   onChange={e => setSearchId(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleSearch()}
-                  className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input-indigo !py-1.5 w-36"
                 />
                 <button
                   onClick={handleSearch}
-                  className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 transition-colors"
+                  className="btn-ghost !p-1.5"
                   title="Search"
                 >
                   <Search size={15} />
                 </button>
                 <button
                   onClick={loadAll}
-                  className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 transition-colors"
+                  className="btn-ghost !p-1.5"
                   title="Show all / Refresh"
                 >
                   <RefreshCw size={15} />
@@ -439,48 +455,49 @@ const DbExplorer = () => {
               {/* Add New */}
               <button
                 onClick={handleAdd}
-                className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm px-4 py-1.5 rounded-lg transition-colors"
+                className="btn-ghast text-xs gap-2 px-4 py-1.5"
               >
-                <Plus size={15} /> Add New
+                <Plus size={14} /> Add New
               </button>
             </div>
           </div>
 
           {/* Error */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">
+            <div className="flex items-center gap-2 text-xs px-3 py-2.5 rounded-lg mb-4"
+              style={{ background: "rgba(239,68,68,0.08)", color: "#F87171", border: "1px solid rgba(239,68,68,0.2)" }}>
               {error}
             </div>
           )}
 
           {/* Table */}
           {loading ? (
-            <div className="text-slate-400 text-sm py-8 text-center">Loading...</div>
+            <div className="text-sm py-8 text-center" style={{ color: "#475569" }}>Loading...</div>
           ) : records.length === 0 && !error ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
-              <Database className="mx-auto text-slate-300 mb-2" size={36} />
-              <p className="text-slate-400 text-sm">No records found.</p>
+            <div className="card p-10 text-center">
+              <Database className="mx-auto mb-2" size={28} style={{ color: "#334155" }} />
+              <p className="text-sm" style={{ color: "#475569" }}>No records found.</p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="card overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-slate-50 border-b border-slate-200">
+                <table className="table-dark min-w-full text-sm">
+                  <thead>
                     <tr>
                       {cfg.columns.map(col => (
-                        <th key={col.key} className="text-left px-4 py-3 text-slate-500 font-medium whitespace-nowrap">
+                        <th key={col.key} className="text-left px-4 py-3 text-slate-400 font-medium whitespace-nowrap">
                           {col.label}
                         </th>
                       ))}
-                      <th className="text-left px-4 py-3 text-slate-500 font-medium">Edit</th>
-                      <th className="text-left px-4 py-3 text-slate-500 font-medium">Delete</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Edit</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Delete</th>
                     </tr>
                   </thead>
                   <tbody>
                     {records.map((rec, i) => (
-                      <tr key={rec[cfg.primaryKey] ?? i} className="border-b border-slate-100 hover:bg-slate-50">
+                      <tr key={rec[cfg.primaryKey] ?? i} className="border-b border-white/5 hover:bg-white/5">
                         {cfg.columns.map(col => (
-                          <td key={col.key} className="px-4 py-3 text-slate-700 max-w-[160px]">
+                          <td key={col.key} className="px-4 py-3 max-w-[160px]" style={{ color: "#F8FAFC" }}>
                             {renderCell(col, rec[col.key])}
                           </td>
                         ))}
@@ -488,7 +505,7 @@ const DbExplorer = () => {
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleEdit(rec)}
-                            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-medium transition-colors"
+                            className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-indigo-400" style={{ color: "#818CF8" }}
                           >
                             <Pencil size={13} /> Edit
                           </button>
@@ -497,7 +514,7 @@ const DbExplorer = () => {
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleDelete(rec)}
-                            className="flex items-center gap-1 text-red-500 hover:text-red-700 text-xs font-medium transition-colors"
+                            className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-red-400" style={{ color: "#F87171" }}
                           >
                             <Trash2 size={13} /> Delete
                           </button>

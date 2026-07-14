@@ -1,4 +1,4 @@
-﻿using Com.Application.Domain.Contract;
+using Com.Application.Domain.Contract;
 using Com.Application.Domain.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -53,5 +53,19 @@ namespace Com.Application.Domain.ReadAPI.Controllers
             //    return BadRequest(ex.Message);
             //}
         }   
+
+        [HttpGet("email/{email}")]
+        public async Task<IActionResult> GetByEmail(string email, [FromServices] Com.Application.Domain.DataAccessContract.IReadDataAccess<Customer, int> dataAccess)
+        {
+            var da = dataAccess as Com.Application.Domain.ReadDataAccess.CustomerReadDataAccess;
+            if (da == null) return StatusCode(500, "Internal data access error");
+
+            var customer = await da.GetByEmailAsync(email);
+            if (customer.Record == null)
+            {
+                return NotFound($"Customer with Email {email} not found.");
+            }
+            return Ok(customer);
+        }
     }
 }

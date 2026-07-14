@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
@@ -25,6 +25,11 @@ public partial class Customer : BaseEntity
     public string? BloodGroup { get; set; }
 
     public string? HistoricalDisease { get; set; }
+
+    public string? Password { get; set; }
+
+    public decimal? RiskScore { get; set; }
+
     [JsonIgnore]
     public virtual ICollection<Policy> Policies { get; set; } = new List<Policy>();
 }

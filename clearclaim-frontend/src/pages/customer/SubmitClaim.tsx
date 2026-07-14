@@ -1,17 +1,20 @@
 // SubmitClaim.tsx — Multi-step form wizard with AI risk preview
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../store/store";
 import { readApi, writeApi } from "../../services/axiosConfig";
 import { AgentHttpService } from "../../services/AgentHttpService";
 import FraudScoreBadge from "../../components/FraudScoreBadge";
 import GhastButton from "../../components/GhastButton";
-import { FileText, Shield, CheckCircle, ArrowRight, ArrowLeft, Bot, Check, AlertTriangle } from "lucide-react";
+import { FileText, Shield, CheckCircle, ArrowRight, ArrowLeft, Bot, Check, AlertTriangle, Wallet, Building } from "lucide-react";
 
 export default function SubmitClaim() {
-  const { userId } = useSelector((state: RootState) => state.auth);
+  const navigate = useNavigate();
+  const { userId, walletAddress } = useSelector((state: RootState) => state.auth);
   const [step, setStep] = useState(1);
+  const [payoutDestination, setPayoutDestination] = useState<"fiat" | "crypto">("fiat");
   const [policies, setPolicies] = useState<any[]>([]);
   const [hospitals, setHospitals] = useState<any[]>([]);
   const [hospitalsLoading, setHospitalsLoading] = useState(false);
@@ -34,6 +37,7 @@ export default function SubmitClaim() {
   const [aiPreview, setAiPreview] = useState<{ score: number; risk: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [success, setSuccess] = useState(false);
 
   // Load only this customer's ACTIVE policies on mount
@@ -111,6 +115,7 @@ export default function SubmitClaim() {
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    setSubmitError("");
     try {
       // Use the correct business endpoint with query params
       await writeApi.post("/api/claims/submit", null, {
@@ -128,7 +133,7 @@ export default function SubmitClaim() {
       const msg = e?.response?.data?.errorMessage ||
                   (typeof e?.response?.data === 'string' ? e.response.data : null) ||
                   "Failed to submit claim. Please check all details and try again.";
-      alert(msg);
+      setSubmitError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -142,7 +147,7 @@ export default function SubmitClaim() {
         </div>
         <h2 className="text-2xl font-bold mb-2 text-white">Claim Submitted!</h2>
         <p className="text-sm text-slate-400 mb-6">Your claim has been successfully submitted and is now queued for AI Agent review. You will be notified of the decision shortly.</p>
-        <button onClick={() => window.location.href="/my-claims"} className="btn-primary w-full">View My Claims</button>
+        <button onClick={() => navigate("/my-claims")} className="btn-primary w-full">View My Claims</button>
       </motion.div>
     );
   }
@@ -312,11 +317,47 @@ export default function SubmitClaim() {
                 />
                 <p className="text-xs text-slate-600 mt-1">{form.description.length}/500 characters</p>
               </div>
+
+              {/* Payout Destination Toggle */}
+              {walletAddress && (
+                <div className="pt-3 border-t border-white/5">
+                  <label className="block text-sm font-medium mb-3 text-slate-300">Payout Destination</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div 
+                      onClick={() => setPayoutDestination("fiat")}
+                      className={`p-3 rounded-xl cursor-pointer border transition-all flex items-center gap-3 ${payoutDestination === "fiat" ? "border-indigo-500 bg-indigo-500/10" : "border-white/10 bg-white/5 hover:border-white/20"}`}
+                    >
+                      <Building size={16} className={payoutDestination === "fiat" ? "text-indigo-400" : "text-slate-500"} />
+                      <div>
+                        <p className="text-xs font-semibold text-white">Bank Transfer</p>
+                        <p className="text-[10px] text-slate-400">Fiat (INR) - 7 to 14 days</p>
+                      </div>
+                    </div>
+                    <div 
+                      onClick={() => setPayoutDestination("crypto")}
+                      className={`p-3 rounded-xl cursor-pointer border transition-all flex items-center gap-3 ${payoutDestination === "crypto" ? "border-emerald-500 bg-emerald-500/10" : "border-white/10 bg-white/5 hover:border-white/20"}`}
+                    >
+                      <Wallet size={16} className={payoutDestination === "crypto" ? "text-emerald-400" : "text-slate-500"} />
+                      <div className="overflow-hidden">
+                        <p className="text-xs font-semibold text-white">OKX Wallet</p>
+                        <p className="text-[10px] text-emerald-300 truncate">Instant • {`${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </motion.div>
           )}
 
           {step === 3 && (
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1 space-y-6">
+              {submitError && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <AlertTriangle size={14} className="text-red-400 shrink-0" />
+                  <p className="text-xs text-red-400">{submitError}</p>
+                </div>
+              )}
               <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
                 <div className="flex items-center gap-2 mb-3">
                   <Bot size={18} className="text-blue-400 animate-pulse-glow" />

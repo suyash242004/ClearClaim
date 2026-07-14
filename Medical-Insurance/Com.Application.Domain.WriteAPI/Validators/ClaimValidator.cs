@@ -1,4 +1,4 @@
-﻿
+
 using Com.Application.Domain.Entities;
 using FluentValidation;
 namespace Com.Application.Domain.WriteAPI.Validators
@@ -10,8 +10,7 @@ namespace Com.Application.Domain.WriteAPI.Validators
     {
         public ClaimValidator()
         {
-            RuleFor(c => c.ClaimId)
-                .GreaterThan(0).WithMessage("Claim ID must be greater than zero.");
+
 
             RuleFor(c => c.PolicyId)
                 .GreaterThan(0).WithMessage("Policy ID must be greater than zero.");

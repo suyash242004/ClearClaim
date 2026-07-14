@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Com.Application.Domain.Entities;
 
@@ -23,6 +24,12 @@ public partial class Policy : BaseEntity
     public bool? IsActive { get; set; }
 
     public int? RenewalCount { get; set; }
+
+    [NotMapped]
+    public string? PlanName { get; set; }
+
+    [NotMapped]
+    public decimal? CoverageAmount { get; set; }
 
     [JsonIgnore]
     public virtual ICollection<Claim> Claims { get; set; } = new List<Claim>();

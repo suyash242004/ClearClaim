@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
@@ -25,6 +25,17 @@ public partial class Claim : BaseEntity
     public string? DoctorName { get; set; }
 
     public string? Description { get; set; }
+
+    // AI Agent output fields — populated by Python claim_processor agent
+    public string? AiDecision { get; set; }      // 'Approve' | 'Reject' | 'Flag'
+
+    public string? AiReasoning { get; set; }     // Full AI explanation text
+
+    public decimal? AiConfidence { get; set; }   // 0.00 to 1.00
+
+    public int? FraudScore { get; set; }         // 0-100 risk score
+
+    public string? TxHash { get; set; }          // X Layer blockchain tx hash
 
     //public virtual Hospital Hospital { get; set; } = null!;
     [JsonIgnore]

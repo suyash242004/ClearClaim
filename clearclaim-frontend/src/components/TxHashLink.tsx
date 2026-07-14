@@ -28,7 +28,7 @@ export default function TxHashLink({ hash }: Props) {
         {copied ? <Check size={11} color="#00C896" /> : <Copy size={11} color="#00D4FF" />}
       </button>
       <a
-        href={`https://explorer.xlayer.tech/tx/${hash}`}
+        href={`https://www.oklink.com/xlayer-test/tx/${hash}`}
         target="_blank"
         rel="noopener noreferrer"
         className="transition-opacity hover:opacity-100 opacity-60"

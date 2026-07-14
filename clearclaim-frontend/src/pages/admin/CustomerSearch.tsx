@@ -1,11 +1,8 @@
-// CustomerSearch.tsx
-// Admin can search customers by city, profession, blood group, disease
-// GET /api/admin/customers/search
-
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import AdminHttpService from "../../services/AdminHttpService";
 import type { Customer } from "../../models/Customer";
-import { Search, Users } from "lucide-react";
+import { Search, Users, X, AlertTriangle } from "lucide-react";
 
 const CustomerSearch = () => {
   const [city, setCity] = useState("");
@@ -47,173 +44,167 @@ const CustomerSearch = () => {
     }
   };
 
-  // Clear all filters and results
   const handleClear = () => {
-    setCity("");
-    setProfession("");
-    setBloodGroup("");
-    setDisease("");
-    setCustomers([]);
-    setError("");
-    setMessage("");
+    setCity(""); setProfession(""); setBloodGroup(""); setDisease("");
+    setCustomers([]); setError(""); setMessage("");
   };
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-slate-800 mb-1">
-        Customer Search
-      </h2>
-      <p className="text-slate-500 text-sm mb-6">
-        Search customers by city, profession, blood group or disease.
-      </p>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+    >
+      {/* Page header */}
+      <div className="mb-8">
+        <p className="text-xs font-medium tracking-[0.2em] uppercase mb-3" style={{ color: "#6366F1" }}>
+          Admin · Directory
+        </p>
+        <h1 className="font-bold leading-tight mb-2" style={{ fontSize: "clamp(28px, 3.5vw, 40px)", color: "#F8FAFC", letterSpacing: "-0.02em" }}>
+          Customer search.{" "}
+          <span className="font-serif-italic" style={{ fontWeight: 400, color: "#888899" }}>Filtered instantly.</span>
+        </h1>
+        <p className="text-sm max-w-lg" style={{ color: "#888899" }}>
+          Search customers by city, profession, blood group, or medical history.
+        </p>
+      </div>
 
       {/* Search Filters */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-        <div className="grid grid-cols-4 gap-4 mb-4">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="card p-5 mb-6"
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <FilterInput label="City" value={city} onChange={setCity} placeholder="e.g. Pune" />
+          <FilterInput label="Profession" value={profession} onChange={setProfession} placeholder="e.g. Doctor" />
           <div>
-            <label className="text-sm text-slate-500 mb-1 block">City</label>
-            <input
-              type="text"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="e.g. Pune"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-slate-500 mb-1 block">
-              Profession
-            </label>
-            <input
-              type="text"
-              value={profession}
-              onChange={(e) => setProfession(e.target.value)}
-              placeholder="e.g. Doctor"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-slate-500 mb-1 block">
+            <label className="text-xs font-medium uppercase tracking-wider mb-2 block" style={{ color: "#94A3B8" }}>
               Blood Group
             </label>
             <select
               value={bloodGroup}
               onChange={(e) => setBloodGroup(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input-indigo"
             >
-              <option value="">-- Any --</option>
-              {[
-                "A+ve",
-                "A-ve",
-                "B+ve",
-                "B-ve",
-                "O+ve",
-                "O-ve",
-                "AB+ve",
-                "AB-ve",
-              ].map((bg) => (
-                <option key={bg} value={bg}>
-                  {bg}
-                </option>
+              <option value="">— Any —</option>
+              {["A+ve", "A-ve", "B+ve", "B-ve", "O+ve", "O-ve", "AB+ve", "AB-ve"].map((bg) => (
+                <option key={bg} value={bg}>{bg}</option>
               ))}
             </select>
           </div>
-          <div>
-            <label className="text-sm text-slate-500 mb-1 block">Disease</label>
-            <input
-              type="text"
-              value={disease}
-              onChange={(e) => setDisease(e.target.value)}
-              placeholder="e.g. Diabetes"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+          <FilterInput label="Disease" value={disease} onChange={setDisease} placeholder="e.g. Diabetes" />
         </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={handleSearch}
-            className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm px-4 py-2 rounded-lg transition-colors"
-          >
-            <Search size={16} />
-            {loading ? "Searching..." : "Search"}
+        <div className="flex gap-3 flex-wrap">
+          <button onClick={handleSearch} disabled={loading} className="btn-ghast text-xs gap-2 px-5 py-2.5">
+            {loading ? (
+              <span className="w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+            ) : (
+              <Search size={14} />
+            )}
+            {loading ? "Searching…" : "Search"}
           </button>
-          <button
-            onClick={handleClear}
-            className="text-sm text-slate-500 hover:text-slate-700 px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 transition-colors"
-          >
-            Clear
+          <button onClick={handleClear} className="btn-ghost gap-1.5">
+            <X size={13} /> Clear
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-      {message && <p className="text-slate-400 text-sm mb-4">{message}</p>}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center gap-2 text-xs px-3 py-2.5 rounded-lg mb-4"
+            style={{ background: "rgba(239,68,68,0.08)", color: "#F87171", border: "1px solid rgba(239,68,68,0.2)" }}
+          >
+            <AlertTriangle size={13} /> {error}
+          </motion.div>
+        )}
+        {message && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="text-xs mb-4"
+            style={{ color: "#64748B" }}
+          >
+            {message}
+          </motion.p>
+        )}
+      </AnimatePresence>
 
       {/* Results */}
       {customers.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-2">
-            <Users size={16} className="text-slate-400" />
-            <span className="text-sm text-slate-500">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="card overflow-hidden"
+        >
+          <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <Users size={14} style={{ color: "#6366F1" }} />
+            <span className="text-xs font-medium" style={{ color: "#94A3B8" }}>
               {customers.length} customer(s) found
             </span>
           </div>
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  ID
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Name
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Email
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  City
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Profession
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Blood Group
-                </th>
-                <th className="text-left px-4 py-3 text-slate-500 font-medium">
-                  Age
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {customers.map((c) => (
-                <tr
-                  key={c.customerId}
-                  className="border-b border-slate-100 hover:bg-slate-50"
-                >
-                  <td className="px-4 py-3 text-slate-700">{c.customerId}</td>
-                  <td className="px-4 py-3 text-slate-700 font-medium">
-                    {c.customerName}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {c.customerEmail}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{c.city ?? "—"}</td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {c.profession ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {c.bloodGroup ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{c.age ?? "—"}</td>
+          <div className="overflow-x-auto">
+            <table className="table-dark w-full text-sm">
+              <thead>
+                <tr>
+                  {["ID", "Name", "Email", "City", "Profession", "Blood Group", "Age"].map((h) => (
+                    <th key={h} className="text-left px-4 py-3 text-slate-400 font-medium">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {customers.map((c, i) => (
+                  <motion.tr
+                    key={c.customerId}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.03 }}
+                    className="border-b border-white/5 hover:bg-white/5"
+                  >
+                    <td className="px-4 py-3 font-mono font-bold" style={{ color: "#60A5FA" }}>#{c.customerId}</td>
+                    <td className="px-4 py-3 font-medium" style={{ color: "#F8FAFC" }}>{c.customerName}</td>
+                    <td className="px-4 py-3" style={{ color: "#CBD5E1" }}>{c.customerEmail}</td>
+                    <td className="px-4 py-3" style={{ color: "#CBD5E1" }}>{c.city ?? "—"}</td>
+                    <td className="px-4 py-3" style={{ color: "#CBD5E1" }}>{c.profession ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      {c.bloodGroup ? (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.1)", color: "#F87171", border: "1px solid rgba(239,68,68,0.2)" }}>
+                          {c.bloodGroup}
+                        </span>
+                      ) : <span style={{ color: "#475569" }}>—</span>}
+                    </td>
+                    <td className="px-4 py-3" style={{ color: "#CBD5E1" }}>{c.age ?? "—"}</td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 };
+
+const FilterInput = ({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) => (
+  <div>
+    <label className="text-xs font-medium uppercase tracking-wider mb-2 block" style={{ color: "#94A3B8" }}>
+      {label}
+    </label>
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="input-indigo"
+    />
+  </div>
+);
 
 export default CustomerSearch;

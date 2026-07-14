@@ -18,15 +18,18 @@ namespace Com.Application.Domain.ReadAPI.Controllers.BusinessControllers
         [HttpGet("pending")]
         public async Task<IActionResult> GetPendingClaims()
         {
-            //try
-            //{
-                var response = await repo.GetPendingClaimsAsync();
-                return Ok(response);
-            //}
-            //catch (Exception ex)
-            //{
-            //    return BadRequest(ex.Message);
-            //}
+            var response = await repo.GetPendingClaimsAsync();
+            return Ok(response);
+        }
+
+        // GET /api/admin/claims/with-ai
+        // Returns all claims including AI decision, fraud score, tx hash columns.
+        // Used by frontend to load persisted AI data on page mount.
+        [HttpGet("with-ai")]
+        public async Task<IActionResult> GetClaimsWithAiData()
+        {
+            var response = await repo.GetClaimsWithAiDataAsync();
+            return Ok(response);
         }
     }
 }

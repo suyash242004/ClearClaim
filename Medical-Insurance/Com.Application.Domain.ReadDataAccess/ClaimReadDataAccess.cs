@@ -1,4 +1,4 @@
-﻿using Com.Application.Domain.DataAccessContract;
+using Com.Application.Domain.DataAccessContract;
 using Com.Application.Domain.Entities;
 using Dapper;
 using Dapper.Contrib;
@@ -52,7 +52,7 @@ namespace Com.Application.Domain.ReadDataAccess
                     DoctorName = x.doctor_name,
                     Description = x.description,
                     Status = x.status
-                });
+                }).ToList();
 
                 response.Message = "Records read successfully.";
                 response.ResponseCode = 200;

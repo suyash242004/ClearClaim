@@ -1,4 +1,4 @@
-﻿using Com.Application.Domain.Contract;
+using Com.Application.Domain.Contract;
 using Com.Application.Domain.DataAccessContract;
 using Com.Application.Domain.Entities;
 
@@ -25,7 +25,7 @@ namespace Com.Application.Domain.WriteRepository
                 if (planId <= 0)
                     throw new Exception("Invalid Plan ID.");
 
-                if (startDate < DateOnly.FromDateTime(DateTime.Today))
+                if (startDate < DateOnly.FromDateTime(DateTime.Today.AddDays(-2)))
                     throw new Exception("Start date cannot be in the past.");
 
                 response = await dataAccess.PurchasePolicyAsync(customerId, planId, startDate);

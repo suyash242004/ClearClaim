@@ -1,4 +1,4 @@
-﻿using Com.Application.Domain.Contract;
+using Com.Application.Domain.Contract;
 using Com.Application.Domain.DataAccessContract;
 using Com.Application.Domain.Entities;
 
@@ -14,6 +14,11 @@ namespace Com.Application.Domain.WriteRepository
         }
 
         public Task<ResponseObject<Claim>> GetPendingClaimsAsync()
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<ResponseObject<Claim>> GetClaimsWithAiDataAsync()
         {
             throw new NotImplementedException();
         }

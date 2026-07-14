@@ -1,15 +1,12 @@
-// MyClaims.tsx
-// Shows all claims raised by the logged in customer
-// Status shown with color badge — Pending / Approved / Rejected
-
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../store/store";
 import ClaimHttpService from "../../services/ClaimHttpService";
 import type { Claim } from "../../models/Claim";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Activity } from "lucide-react";
 import ClaimStatusChip from "../../components/ClaimStatusChip";
 import TxHashLink from "../../components/TxHashLink";
+import { motion } from "framer-motion";
 
 const MyClaims = () => {
   const { userId } = useSelector((state: RootState) => state.auth);
@@ -34,82 +31,107 @@ const MyClaims = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <span className="w-8 h-8 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+        <span className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-white mb-1">My Claims</h2>
-      <p className="text-slate-400 text-sm mb-6">
-        Track all your submitted insurance claims.
-      </p>
-
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="space-y-6"
+    >
+      {/* Header */}
+      <div>
+        <p className="text-xs font-medium tracking-[0.2em] uppercase mb-2" style={{ color: "#6366F1" }}>
+          Claims History
+        </p>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
+          <Activity size={24} className="text-indigo-400" /> My Claims
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Track the real-time status of your insurance claims verified on the blockchain.
+        </p>
+      </div>
 
       {claims.length === 0 ? (
-        <div className="card p-8 text-center">
-          <ClipboardList className="mx-auto text-slate-500 mb-2" size={36} />
-          <p className="text-slate-400 text-sm">No claims found.</p>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="card p-12 text-center border border-white/5 bg-white/[0.01]"
+        >
+          <ClipboardList className="mx-auto text-slate-600 mb-3" size={40} />
+          <p className="text-sm text-slate-400">No claims found.</p>
+          <p className="text-xs text-slate-500 mt-1">Submit a new claim to see it here.</p>
+        </motion.div>
       ) : (
-        <div className="card overflow-hidden">
-          <table className="table-dark w-full text-sm">
-            <thead>
-              <tr>
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">Claim ID</th>
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">Policy ID</th>
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">Disease</th>
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">Amount (₹)</th>
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">Doctor</th>
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">Date</th>
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">AI Decision</th>
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">Status</th>
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">Tx Hash</th>
-              </tr>
-            </thead>
-            <tbody>
-              {claims.map((claim) => (
-                <tr
-                  key={claim.claimId}
-                  className="border-b border-white/5 hover:bg-white/5"
-                >
-                  <td className="px-4 py-3 text-white font-mono font-bold">#{claim.claimId}</td>
-                  <td className="px-4 py-3 text-slate-300">{claim.policyId}</td>
-                  <td className="px-4 py-3 text-slate-300">{claim.disease}</td>
-                  <td className="px-4 py-3 text-slate-300">
-                    ₹{claim.claimAmount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-slate-300">
-                    {claim.doctorName}
-                  </td>
-                  <td className="px-4 py-3 text-slate-300">
-                    {claim.claimDate}
-                  </td>
-                  <td className="px-4 py-3">
-                    {claim.aiDecision ? (
-                      <ClaimStatusChip status={claim.aiDecision as string} />
-                    ) : (
-                      <span className="text-slate-500">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <ClaimStatusChip status={claim.status as string} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {claim.txHash ? (
-                      <TxHashLink hash={claim.txHash} />
-                    ) : (
-                      <span className="text-slate-500">—</span>
-                    )}
-                  </td>
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="card overflow-hidden border border-white/10"
+        >
+          <div className="overflow-x-auto">
+            <table className="table-dark w-full text-sm">
+              <thead>
+                <tr className="bg-white/5 border-b border-white/10">
+                  <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Claim ID</th>
+                  <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Policy ID</th>
+                  <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Disease</th>
+                  <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Amount (₹)</th>
+                  <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+                  <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">AI Decision</th>
+                  <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Tx Hash</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {claims.map((claim) => (
+                  <motion.tr
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    key={claim.claimId}
+                    className="hover:bg-white/[0.02] transition-colors"
+                  >
+                    <td className="px-5 py-4">
+                      <span className="text-indigo-400 font-mono font-bold bg-indigo-500/10 px-2 py-1 rounded-md text-xs">
+                        #{claim.claimId}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-slate-300 font-medium">#{claim.policyId}</td>
+                    <td className="px-5 py-4 text-slate-200 font-semibold">{claim.disease}</td>
+                    <td className="px-5 py-4">
+                      <span className="text-emerald-400 font-bold">
+                        ₹{claim.claimAmount.toLocaleString("en-IN")}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-slate-400 text-xs">{new Date(claim.claimDate).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</td>
+                    <td className="px-5 py-4">
+                      {claim.aiDecision ? (
+                        <ClaimStatusChip status={claim.aiDecision as string} />
+                      ) : (
+                        <span className="text-slate-600 font-mono text-xs">AWAITING</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
+                      <ClaimStatusChip status={claim.status as string} />
+                    </td>
+                    <td className="px-5 py-4">
+                      {claim.txHash ? (
+                        <TxHashLink hash={claim.txHash} />
+                      ) : (
+                        <span className="text-slate-600 font-mono text-xs">UNMINTED</span>
+                      )}
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 };
 

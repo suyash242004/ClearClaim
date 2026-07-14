@@ -30,6 +30,9 @@ export default function PolicyAdvisorWidget({ onClose }: Props) {
     if (!form.budget || budget <= 0) {
       setError("Please enter a valid annual budget."); return;
     }
+    if (budget > 0 && budget < 2000) {
+      setError("Please enter your ANNUAL budget, not monthly (plans start at ₹7,000/yr)."); return;
+    }
     if (!form.city.trim()) {
       setError("Please enter your city."); return;
     }
@@ -106,10 +109,12 @@ export default function PolicyAdvisorWidget({ onClose }: Props) {
             </div>
 
             <div>
-              <label className="block text-xs mb-1" style={{ color: "#4A6080" }}>Monthly Budget (₹)</label>
+              <label className="block text-xs mb-1" style={{ color: "#4A6080" }}>
+                Annual Budget (₹) <span className="opacity-70">(e.g. ₹7000 = Personal Plan)</span>
+              </label>
               <input type="number" value={form.budget}
                 onChange={e => setForm(f => ({ ...f, budget: e.target.value }))}
-                placeholder="10000" className="input-dark text-xs py-2" />
+                placeholder="15000" className="input-dark text-xs py-2" />
             </div>
 
             <div>
@@ -163,12 +168,12 @@ export default function PolicyAdvisorWidget({ onClose }: Props) {
               </p>
               <div className="w-full h-1 rounded-full mb-2" style={{ background: "rgba(255,255,255,0.06)" }}>
                 <div className="h-full rounded-full" style={{
-                  width: `${Math.round(result.confidence_score * 100)}%`,
+                  width: `${Math.min(100, Math.round((result.confidence_score > 1 ? result.confidence_score : result.confidence_score * 100)))}%`,
                   background: "linear-gradient(90deg, #00C896, #00D4FF)"
                 }} />
               </div>
               <p className="text-xs" style={{ color: "#4A6080" }}>
-                {Math.round(result.confidence_score * 100)}% match confidence
+                {Math.min(100, Math.round((result.confidence_score > 1 ? result.confidence_score : result.confidence_score * 100)))}% match confidence
               </p>
             </div>
             <p className="text-xs leading-relaxed" style={{ color: "#B0C4DE" }}>

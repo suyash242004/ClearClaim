@@ -1,0 +1,18 @@
+{
+  "name": "clearclaim-web3",
+  "version": "2.0.0",
+  "description": "ClearClaim AI — 3 Smart contracts on X Layer (OKX). Claim decisions, risk scores, health interventions.",
+  "scripts": {
+    "compile":           "npx hardhat compile",
+    "deploy:testnet":    "npx hardhat run scripts/deploy.js --network xlayer_testnet",
+    "deploy:local":      "npx hardhat run scripts/deploy.js --network hardhat",
+    "extract-abi":       "node scripts/extract_abi.js",
+    "test":              "npx hardhat test",
+    "full-deploy":       "npm run compile && npm run deploy:testnet && npm run extract-abi"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0",
+    "dotenv": "^16.4.0"
+  }
+}

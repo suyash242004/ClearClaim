@@ -1,0 +1,317 @@
+{
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_agentAddress",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "customerId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "riskScoreBps",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "carePlanHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "name": "InterventionRecorded",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "agentAddress",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "customerId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getLatestIntervention",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "riskScoreBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "carePlanHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "highRiskInterventions",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "interventionHistory",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "customerId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "riskScoreBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "carePlanHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "riskFactorsHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "exists",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "latestIntervention",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "customerId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "riskScoreBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "carePlanHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "riskFactorsHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "exists",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "protectedCustomerIds",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "customerId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "riskScoreBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "carePlanHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "riskFactorsHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "recordIntervention",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_newAgent",
+          "type": "address"
+        }
+      ],
+      "name": "setAgentAddress",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalCustomersProtected",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalInterventions",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "customerId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "carePlanJson",
+          "type": "string"
+        }
+      ],
+      "name": "verifyCarePlan",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "verified",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]
+}

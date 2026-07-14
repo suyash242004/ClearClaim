@@ -31,6 +31,24 @@ namespace Com.Application.Domain.ReadRepository
             return response;
         }
 
+        public async Task<ResponseObject<Claim>> GetClaimsWithAiDataAsync()
+        {
+            ResponseObject<Claim> response = new();
+            try
+            {
+                response = await dataAccess.GetClaimsWithAiDataAsync();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(
+                    ex.InnerException?.InnerException?.Message ??
+                    ex.InnerException?.Message ??
+                    ex.Message
+                );
+            }
+            return response;
+        }
+
         public Task<ResponseObject<Claim>> ApproveClaimAsync(int claimId)
         {
             throw new NotImplementedException();

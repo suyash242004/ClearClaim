@@ -6,20 +6,22 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../store/store";
-import { logout } from "../store/authSlice";
+import { logout, setWalletAddress } from "../store/authSlice";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Brain, LogOut, Wallet, FileText, Menu, X,
   LayoutDashboard, ClipboardList, Search, Settings,
-  ShieldCheck, HeartPulse, Users, Building2
+  ShieldCheck, HeartPulse, Users, Building2, Database
 } from "lucide-react";
 
 // ─── Nav link definitions per role ────────────────────────────────
 const adminLinks = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/pending-claims", label: "Claims", icon: ClipboardList },
+  { to: "/review-queue", label: "Review Queue", icon: ShieldCheck },
+  { to: "/economics", label: "Economics", icon: Settings },
   { to: "/customer-search", label: "Customers", icon: Search },
-  { to: "/manage-data", label: "Manage", icon: Settings },
+  { to: "/db-explorer", label: "Manage Data", icon: Database },
 ];
 
 const customerLinks = [
@@ -32,7 +34,10 @@ const customerLinks = [
 ];
 
 const hospitalLinks = [
-  { to: "/", label: "Claims", icon: Building2 },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/claims", label: "Claims", icon: ClipboardList },
+  { to: "/patients", label: "Admissions", icon: Users },
+  { to: "/network", label: "Network", icon: ShieldCheck },
 ];
 
 // ─── Role colors ──────────────────────────────────────────────────
@@ -45,10 +50,9 @@ const roleStyle: Record<string, { color: string; bg: string; label: string }> = 
 export default function Navbar() {
   const dispatch = useDispatch();
   const location = useLocation();
-  const { role } = useSelector((state: RootState) => state.auth);
+  const { role, walletAddress } = useSelector((state: RootState) => state.auth);
 
   const [scrolled, setScrolled] = useState(false);
-  const [wallet, setWallet] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -69,14 +73,31 @@ export default function Navbar() {
 
   const connectWallet = async () => {
     try {
-      const eth = (window as any).ethereum;
-      if (eth) {
-        const accounts = await eth.request({ method: "eth_requestAccounts" });
-        setWallet(accounts[0]);
+      if (typeof window !== "undefined" && (window as any).okxwallet) {
+        const okxwallet = (window as any).okxwallet;
+        // Force the wallet extension to pop up and prompt for account selection
+        await okxwallet.request({
+          method: "wallet_requestPermissions",
+          params: [{ eth_accounts: {} }]
+        });
+        const accounts = await okxwallet.enable();
+        if (accounts && accounts.length > 0) {
+          dispatch(setWalletAddress(accounts[0]));
+        }
       } else {
-        alert("No wallet detected. Please install OKX Wallet or MetaMask.");
+        alert("No OKX Wallet detected. Please install it.");
       }
     } catch { /* user rejected */ }
+  };
+
+  const handleWalletClick = () => {
+    if (walletAddress) {
+      if (confirm("Disconnect OKX Wallet?")) {
+        dispatch(setWalletAddress(null));
+      }
+    } else {
+      connectWallet();
+    }
   };
 
   const isActive = (to: string) =>
@@ -123,9 +144,6 @@ export default function Navbar() {
                   {label}
                 </Link>
               ))}
-              <Link to="/docs" className={`nav-link-v2 ${location.pathname === "/docs" ? "active" : ""}`}>
-                Docs
-              </Link>
             </nav>
           )}
 
@@ -148,22 +166,22 @@ export default function Navbar() {
 
             {/* Wallet connect — OKX-style */}
             <button
-              onClick={connectWallet}
+              onClick={handleWalletClick}
               className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all duration-150"
               style={{
-                background: wallet ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.05)",
-                border: wallet ? "1px solid rgba(16,185,129,0.25)" : "1px solid rgba(255,255,255,0.1)",
-                color: wallet ? "#34D399" : "#94A3B8",
+                background: walletAddress ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.05)",
+                border: walletAddress ? "1px solid rgba(16,185,129,0.25)" : "1px solid rgba(255,255,255,0.1)",
+                color: walletAddress ? "#34D399" : "#94A3B8",
               }}
             >
-              {wallet ? (
+              {walletAddress ? (
                 <>
                   <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#34D399" }} />
-                  {`${wallet.slice(0, 6)}…${wallet.slice(-4)}`}
+                  {`${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`}
                 </>
               ) : (
                 <>
-                  <Wallet size={12} />
+                  <Wallet size={12} style={{ color: "#94A3B8" }} />
                   Connect
                 </>
               )}
@@ -243,21 +261,15 @@ export default function Navbar() {
                   {label}
                 </Link>
               ))}
-              <Link
-                to="/docs"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
-              >
-                <FileText size={15} />
-                Docs
-              </Link>
-              {/* Wallet on mobile */}
-              <button
-                onClick={connectWallet}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-colors text-left"
-              >
-                <Wallet size={15} />
-                {wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : "Connect Wallet"}
-              </button>
+                {/* Mobile wallet */}
+                <button
+                  onClick={() => { handleWalletClick(); setMobileOpen(false); }}
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-colors"
+                  style={{ color: walletAddress ? "#34D399" : "#94A3B8", background: walletAddress ? "rgba(16,185,129,0.05)" : "transparent" }}
+                >
+                  <Wallet size={16} />
+                  {walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}` : "Connect Wallet"}
+                </button>
             </div>
           </motion.div>
         )}

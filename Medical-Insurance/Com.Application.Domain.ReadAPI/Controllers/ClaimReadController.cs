@@ -30,6 +30,9 @@ namespace Com.Application.Domain.ReadAPI.Controllers
         }
 
         [HttpGet("{id}")]
+        // Route alias consumed by the AI agent gateway (agents/mcp/router.py -> GET /api/claims/{id}).
+        // Leading slash makes it an absolute route, so it coexists with api/ClaimRead/{id}.
+        [HttpGet("/api/claims/{id}")]
         public async Task<IActionResult> GetClaim(int id)
         {
             //try

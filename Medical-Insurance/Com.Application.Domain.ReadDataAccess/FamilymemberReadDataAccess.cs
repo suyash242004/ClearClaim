@@ -1,4 +1,4 @@
-﻿using Com.Application.Domain.DataAccessContract;
+using Com.Application.Domain.DataAccessContract;
 using Com.Application.Domain.Entities;
 using Dapper;
 using Dapper.Contrib;
@@ -26,7 +26,8 @@ namespace Com.Application.Domain.ReadDataAccess
             try
             {
                 await conn.OpenAsync();
-                response.Records = await conn.QueryAsync<Familymember>("SELECT * FROM familymember");
+                var data = await conn.QueryAsync<Familymember>("SELECT * FROM familymember");
+                response.Records = data.ToList();
                 response.Message = "Records read successfully.";
                 response.ResponseCode = 200;
                 await conn.CloseAsync();

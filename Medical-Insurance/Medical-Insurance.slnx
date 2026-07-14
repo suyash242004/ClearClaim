@@ -4,18 +4,18 @@
     <Project Path="Com.Application.Domain.WriteAPI/Com.Application.Domain.WriteAPI.csproj" Id="34a75460-f764-49e6-99d1-f410c80f9dd4" />
   </Folder>
   <Folder Name="/Contracts/">
-    <Project Path="D:/C#/Medical-Insurance/Com.Application.Domain.Contract/Com.Application.Domain.Contract.csproj" Id="f02f08cd-1256-46f3-b9f5-01a7c15aae09" />
-    <Project Path="D:/C#/Medical-Insurance/Com.Application.Domain.DataAccessContract/Com.Application.Domain.DataAccessContract.csproj" Id="95215df5-4886-4007-b2b2-f7e5f627c2e2" />
+    <Project Path="D:/ClearClaim/Medical-Insurance/Com.Application.Domain.Contract/Com.Application.Domain.Contract.csproj" Id="f02f08cd-1256-46f3-b9f5-01a7c15aae09" />
+    <Project Path="D:/ClearClaim/Medical-Insurance/Com.Application.Domain.DataAccessContract/Com.Application.Domain.DataAccessContract.csproj" Id="95215df5-4886-4007-b2b2-f7e5f627c2e2" />
   </Folder>
   <Folder Name="/DataAccess/">
-    <Project Path="D:/C#/Medical-Insurance/Com.Application.Domain.ReadDataAccess/Com.Application.Domain.ReadDataAccess.csproj" Id="b3c215ad-3c28-498c-bfdf-20e8ea379cd4" />
-    <Project Path="D:/C#/Medical-Insurance/Com.Application.Domain.WriteDataAccess/Com.Application.Domain.WriteDataAccess.csproj" Id="5e3bcf51-810a-4705-aebf-fb50ecb3d846" />
+    <Project Path="D:/ClearClaim/Medical-Insurance/Com.Application.Domain.ReadDataAccess/Com.Application.Domain.ReadDataAccess.csproj" Id="b3c215ad-3c28-498c-bfdf-20e8ea379cd4" />
+    <Project Path="D:/ClearClaim/Medical-Insurance/Com.Application.Domain.WriteDataAccess/Com.Application.Domain.WriteDataAccess.csproj" Id="5e3bcf51-810a-4705-aebf-fb50ecb3d846" />
   </Folder>
   <Folder Name="/DomainEntities/">
-    <Project Path="D:/C#/Medical-Insurance/Com.Application.Domain.Entities/Com.Application.Domain.Entities.csproj" Id="4bea351a-aaa9-4692-a820-981324df8af1" />
+    <Project Path="D:/ClearClaim/Medical-Insurance/Com.Application.Domain.Entities/Com.Application.Domain.Entities.csproj" Id="4bea351a-aaa9-4692-a820-981324df8af1" />
   </Folder>
   <Folder Name="/Repositories/">
-    <Project Path="D:/C#/Medical-Insurance/Com.Application.Domain.ReadRepository/Com.Application.Domain.ReadRepository.csproj" Id="ae1c09ff-3de2-44e4-a939-7097ac5a07e7" />
-    <Project Path="D:/C#/Medical-Insurance/Com.Application.Domain.WriteRespository/Com.Application.Domain.WriteRepository.csproj" Id="678aa967-bda5-40fa-913a-22e8e1d5600a" />
+    <Project Path="D:/ClearClaim/Medical-Insurance/Com.Application.Domain.ReadRepository/Com.Application.Domain.ReadRepository.csproj" Id="ae1c09ff-3de2-44e4-a939-7097ac5a07e7" />
+    <Project Path="D:/ClearClaim/Medical-Insurance/Com.Application.Domain.WriteRespository/Com.Application.Domain.WriteRepository.csproj" Id="678aa967-bda5-40fa-913a-22e8e1d5600a" />
   </Folder>
 </Solution>

@@ -1,0 +1,22 @@
+{
+  "network": "X Layer Testnet",
+  "chainId": 1952,
+  "deployer": "0x98682146fC566C9304Dd57aF9b5C2115aF537A6f",
+  "agentAddress": "0x98682146fC566C9304Dd57aF9b5C2115aF537A6f",
+  "deployedAt": "2026-07-12",
+  "contracts": {
+    "InsuranceClaim":  "0xed7c36ce8EB540e35604a9eeFa72f3b19106A709",
+    "RiskOracle":      "0x428bE934f782D0Ba4556cB84680bDe233d07cc1a",
+    "HealthGuardian":  "0x0F4FEB6E515eEEb90bed9E6cC10f556a6c7287dE",
+    "HealthPassport":  "0x63cC01DDC2aCd8a230679E29A7Be7EBe5769f3E3",
+    "PremiumVault":    "DEPLOY_PENDING"
+  },
+  "explorerBase": "https://web3.okx.com/explorer/x-layer-testnet/address/",
+  "notes": {
+    "InsuranceClaim": "Records AI claim decisions (Approve/Reject/Flag) with reasoning hash + confidence",
+    "RiskOracle":     "Records predictive risk scores per customer (basis points)",
+    "HealthGuardian": "Records proactive care plan interventions onchain",
+    "HealthPassport": "Soul-Bound Token (SBT) — non-transferable patient health identity",
+    "PremiumVault":   "Accepts premium payments in OKB, emits PremiumPaid event"
+  }
+}

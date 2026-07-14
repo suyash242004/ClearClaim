@@ -1,4 +1,4 @@
-﻿using Com.Application.Domain.Contract;
+using Com.Application.Domain.Contract;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Com.Application.Domain.WriteAPI.Controllers.BusinessControllers
@@ -25,7 +25,7 @@ namespace Com.Application.Domain.WriteAPI.Controllers.BusinessControllers
             //{
             if (customerId <= 0) throw new Exception("Invalid customer ID.");
             if (planId <= 0) throw new Exception("Invalid plan ID.");
-            if (startDate < DateOnly.FromDateTime(DateTime.Today))
+            if (startDate < DateOnly.FromDateTime(DateTime.Today.AddDays(-2)))
                 throw new Exception("Start date cannot be in the past.");
 
             var response = await repo.PurchasePolicyAsync(customerId, planId, startDate);

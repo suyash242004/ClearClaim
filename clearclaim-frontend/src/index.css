@@ -47,31 +47,47 @@
 
 @layer components {
 
+  /* ── Glass Card ─────────────────────────────────────────────────── */
+  .glass {
+    background: rgba(12, 16, 24, 0.7);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+
   /* ── Cards ─────────────────────────────────────────────────────── */
   .card {
-    background: #0C1018;
-    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(12, 16, 24, 0.85);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   .card-hover {
-    background: #0C1018;
-    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(12, 16, 24, 0.85);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
   }
   .card-hover:hover {
-    border-color: rgba(255,255,255,0.12);
-    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
-    transform: translateY(-1px);
+    border-color: rgba(255,255,255,0.15);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transform: translateY(-2px);
   }
 
   /* Glowing accent card for featured elements */
   .card-accent {
-    background: #0C1018;
-    border: 1px solid rgba(37,99,235,0.35);
+    background: rgba(12, 16, 24, 0.85);
+    border: 1px solid rgba(99,102,241,0.35);
     border-radius: 12px;
-    box-shadow: 0 0 0 1px rgba(37,99,235,0.1) inset;
+    box-shadow: 0 0 0 1px rgba(99,102,241,0.1) inset;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   /* ── Gradient text ──────────────────────────────────────────────── */
@@ -611,6 +627,24 @@
   border-color: #6366F1;
   box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
 }
+.input-amber {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  color: #F8FAFC;
+  background: #111;
+  border: 1px solid #333;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.input-amber::placeholder { color: #555; }
+.input-amber:focus {
+  border-color: #F59E0B;
+  box-shadow: 0 0 0 3px rgba(245,158,11,0.15);
+}
 
 /* ── Step progress (Linear-style) ─────────────────────────────────── */
 .step-progress {
@@ -717,3 +751,6 @@
   pointer-events: none;
 }
 
+.hide-chat-widget #global-chat-widget {
+  display: none !important;
+}

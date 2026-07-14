@@ -10,4 +10,6 @@ export interface Policy {
   endDate: string;
   isActive: boolean;
   renewalCount: number;
+  planName?: string;
+  coverageAmount?: number;
 }

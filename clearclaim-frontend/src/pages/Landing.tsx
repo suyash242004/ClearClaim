@@ -126,12 +126,6 @@ export default function Landing() {
                 >
                   Launch App <ArrowRight size={14} />
                 </button>
-                <a
-                  href="/docs"
-                  className="btn-ghast-dark text-sm px-7 py-3"
-                >
-                  Read the docs
-                </a>
               </div>
             </motion.div>
 
@@ -443,10 +437,10 @@ export default function Landing() {
             Built for OKX.AI Genesis Hackathon 2026 · Powered by Gemini & X Layer
           </p>
           <div className="flex items-center gap-6">
-            {["GitHub", "Docs", "X Layer"].map((link) => (
+            {["GitHub", "X Layer"].map((link) => (
               <a
                 key={link}
-                href={link === "Docs" ? "/docs" : "#"}
+                href="#"
                 className="text-xs transition-colors"
                 style={{ color: "#555" }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = "#fff")}

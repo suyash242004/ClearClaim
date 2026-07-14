@@ -3,9 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import type { RootState } from "./store/store";
 import { motion } from "framer-motion";
-import Login from "./pages/Login";
 import Landing from "./pages/Landing";
-import DbExplorer from "./pages/DbExplorer";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import DemoCredentials from "./pages/DemoCredentials";
 import Docs from "./pages/Docs";
 
 // Customer pages
@@ -21,12 +22,18 @@ import FamilyMembers from "./pages/customer/FamilyMembers";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import PendingClaims from "./pages/admin/PendingClaims";
 import CustomerSearch from "./pages/admin/CustomerSearch";
-import ManageData from "./pages/admin/ManageData";
+import ReviewQueue from "./pages/admin/ReviewQueue";
+import AgentEconomics from "./pages/admin/AgentEconomics";
+import DbExplorer from "./pages/DbExplorer";
 
 // Hospital pages
+import HospitalDashboard from "./pages/hospital/HospitalDashboard";
 import HospitalClaims from "./pages/hospital/HospitalClaims";
+import HospitalPatientLookup from "./pages/hospital/HospitalPatientLookup";
+import HospitalNetwork from "./pages/hospital/HospitalNetwork";
 
 import Navbar from "./components/Navbar";
+import ChatWidget from "./components/ChatWidget";
 
 // Page wrapper with fade transition
 const Page = ({ children }: { children: React.ReactNode }) => (
@@ -49,6 +56,8 @@ function AppRoutes() {
       <Routes>
         <Route path="/landing" element={<Landing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/demo" element={<DemoCredentials />} />
         <Route path="/" element={<Navigate to="/landing" replace />} />
         <Route path="/docs" element={<Docs />} />
         <Route path="*" element={<Navigate to="/landing" replace />} />
@@ -76,20 +85,26 @@ function AppRoutes() {
             <>
               <Route path="/" element={<Page><AdminDashboard /></Page>} />
               <Route path="/pending-claims" element={<Page><PendingClaims /></Page>} />
+              <Route path="/review-queue" element={<Page><ReviewQueue /></Page>} />
+              <Route path="/economics" element={<Page><AgentEconomics /></Page>} />
               <Route path="/customer-search" element={<Page><CustomerSearch /></Page>} />
-              <Route path="/manage-data" element={<Page><ManageData /></Page>} />
               <Route path="/db-explorer" element={<Page><DbExplorer /></Page>} />
             </>
           )}
           {role === "hospital" && (
             <>
-              <Route path="/" element={<Page><HospitalClaims /></Page>} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Page><HospitalDashboard /></Page>} />
+              <Route path="/claims" element={<Page><HospitalClaims /></Page>} />
+              <Route path="/patients" element={<Page><HospitalPatientLookup /></Page>} />
+              <Route path="/network" element={<Page><HospitalNetwork /></Page>} />
             </>
           )}
           <Route path="/docs" element={<Page><Docs /></Page>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
+      <ChatWidget />
     </div>
   );
 }

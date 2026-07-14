@@ -17,7 +17,9 @@ import type { Policy } from "../../models/Policy";
 import type { Insuranceplan } from "../../models/Insuranceplan";
 import type { Familymember } from "../../models/Familymember";
 import type { Customer } from "../../models/Customer";
-import { Users, Trash2, UserPlus, Info } from "lucide-react";
+import { Users, Trash2, UserPlus, Info, Shield, CheckCircle, Heart, FileText, Activity } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import SpotlightCard from "../../components/SpotlightCard";
 
 const GENDERS = ["Male", "Female", "Other"];
 
@@ -84,7 +86,9 @@ const FamilyMembers = () => {
         const res = await PolicyHttpService.getByCustomer(userId!);
         setPolicies(res.records ?? []);
       } catch {
-        setError("Failed to load policies.");
+        // ReadAPI returns HTTP 500 when the customer has no policies yet —
+        // show the friendly "No active policies" empty state, not an error
+        setPolicies([]);
       }
     };
     fetchInitialData();
@@ -175,6 +179,19 @@ const FamilyMembers = () => {
 
     if (!memberName.trim()) { setError("Member name is required."); return; }
     if (!relation) { setError("Please select a relation."); return; }
+    
+    // UI Validation for Age (Trigger 6 replicate)
+    if (age && customer?.age) {
+      const numAge = Number(age);
+      if ((relation === "Father" || relation === "Mother") && numAge <= customer.age) {
+        setError("Error: Parent must be strictly older than you.");
+        return;
+      }
+      if ((relation === "Son" || relation === "Daughter") && numAge >= customer.age) {
+        setError("Error: Child must be strictly younger than you.");
+        return;
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -226,37 +243,67 @@ const FamilyMembers = () => {
   };
 
   return (
-    <div>
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="space-y-6"
+    >
       {/* Page Header */}
-      <h2 className="text-xl font-semibold text-white mb-1">
-        Family Members
-      </h2>
-      <p className="text-slate-400 text-sm mb-6">
-        Manage family members covered under your insurance policies.
-      </p>
+      <div>
+        <p className="text-xs font-medium tracking-[0.2em] uppercase mb-2" style={{ color: "#6366F1" }}>
+          Dependents
+        </p>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
+          <Users size={24} className="text-indigo-400" /> Family Members
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Manage family members covered under your insurance policies.
+        </p>
+      </div>
 
-      {/* Policy Selector */}
-      <div className="card p-5 mb-5">
-        <label className="block text-sm text-slate-300 mb-2 font-medium">
+      {/* Policy Selector Chips */}
+      <div>
+        <label className="block text-xs font-semibold tracking-wider text-slate-400 uppercase mb-3">
           Select Policy
         </label>
-        <select
-          value={selectedPolicyId}
-          onChange={(e) => {
-            setSelectedPolicyId(e.target.value);
-            setError("");
-            setSuccess("");
-            setRelation("");
-          }}
-          className="input-indigo"
-        >
-          <option value="">-- Select a Policy --</option>
-          {policies.map((p: any) => (
-            <option key={p.policyId} value={p.policyId}>
-              Policy #{p.policyId} — {p.planName ? `Plan: ${p.planName}` : `Plan ID: ${p.planId}`} ({p.isActive ? "Active" : "Inactive"}) — till {p.endDate}
-            </option>
-          ))}
-        </select>
+        
+        {policies.length === 0 ? (
+          <div className="bg-[#080810] rounded-xl p-4 text-center border border-white/5">
+            <p className="text-sm text-slate-500">No active policies found.</p>
+            <p className="text-xs text-slate-600 mt-1">Purchase a plan from Browse Plans to add family members.</p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {policies.map((p: any) => {
+              const isSelected = selectedPolicyId === String(p.policyId);
+              return (
+                <button
+                  key={p.policyId}
+                  onClick={() => {
+                    setSelectedPolicyId(String(p.policyId));
+                    setError("");
+                    setSuccess("");
+                    setRelation("");
+                  }}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                    isSelected
+                      ? "bg-indigo-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)]"
+                      : "bg-[#080810] border border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-200 hover:bg-white/5"
+                  }`}
+                >
+                  <Shield size={16} className={isSelected ? "text-indigo-200" : "text-slate-500"} />
+                  {p.planName || `Policy #${p.policyId}`}
+                  <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] uppercase font-bold ${
+                    isSelected ? "bg-indigo-900/50 text-indigo-200" : "bg-white/5 text-slate-500"
+                  }`}>
+                    #{p.policyId}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Plan Rules Banner — shown after policy is selected */}
@@ -402,16 +449,6 @@ const FamilyMembers = () => {
                         max={149}
                         className="input-indigo"
                       />
-                      {(relation === "Father" || relation === "Mother") && (
-                        <p className="text-xs text-amber-400 mt-1">
-                          ⚠ Parent must be older than you (DB validated)
-                        </p>
-                      )}
-                      {(relation === "Son" || relation === "Daughter") && (
-                        <p className="text-xs text-amber-400 mt-1">
-                          ⚠ Child must be younger than you (DB validated)
-                        </p>
-                      )}
                     </div>
 
                     {/* Gender */}
@@ -467,77 +504,76 @@ const FamilyMembers = () => {
                   <span className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
                 </div>
               ) : filteredMembers.length === 0 ? (
-                <div className="card p-8 text-center">
+                <div className="card p-8 text-center border-indigo-500/10">
                   <Users className="mx-auto text-slate-500 mb-2" size={36} />
                   <p className="text-slate-400 text-sm">
                     No family members added under this policy yet.
                   </p>
                 </div>
               ) : (
-                <div className="card overflow-hidden">
-                  <table className="table-dark w-full text-sm">
-                    <thead>
-                      <tr>
-                        <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
-                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Name</th>
-                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Relation</th>
-                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Age</th>
-                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Gender</th>
-                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredMembers.map((member) => (
-                        <tr
-                          key={member.memberId}
-                          className="border-b border-white/5 hover:bg-white/5"
-                        >
-                          <td className="px-4 py-3 text-slate-400 text-xs font-mono">#{member.memberId}</td>
-                          <td className="px-4 py-3 text-white font-medium">{member.memberName}</td>
-                          <td className="px-4 py-3">
-                            <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-1 rounded font-bold uppercase tracking-wider">
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredMembers.map((member) => (
+                    <SpotlightCard key={member.memberId} className="flex flex-col border border-white/5 bg-[#080810] p-5">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                            <Heart size={18} className="text-indigo-400" />
+                          </div>
+                          <div>
+                            <h4 className="text-white font-bold">{member.memberName}</h4>
+                            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider inline-block mt-1">
                               {member.relation}
                             </span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-300">{member.age ?? "—"}</td>
-                          <td className="px-4 py-3 text-slate-300">{member.gender ?? "—"}</td>
-                          <td className="px-4 py-3">
-                            {deletingId === member.memberId ? (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => handleDelete(member.memberId)}
-                                  className="text-xs bg-red-500/10 text-red-500 hover:bg-red-500/20 px-2 py-1 rounded transition-colors"
-                                >
-                                  Confirm
-                                </button>
-                                <button
-                                  onClick={() => setDeletingId(null)}
-                                  className="text-xs text-slate-400 hover:text-white px-2 py-1 transition-colors"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => setDeletingId(member.memberId)}
-                                className="flex items-center gap-1 text-red-400 hover:text-red-300 text-xs font-medium transition-colors"
-                              >
-                                <Trash2 size={14} />
-                                Remove
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mb-5 mt-auto">
+                        <div className="bg-white/5 rounded-lg p-2.5">
+                          <p className="text-xs text-slate-500 mb-1">Age</p>
+                          <p className="text-sm font-semibold text-slate-300">{member.age ?? "Not provided"}</p>
+                        </div>
+                        <div className="bg-white/5 rounded-lg p-2.5">
+                          <p className="text-xs text-slate-500 mb-1">Gender</p>
+                          <p className="text-sm font-semibold text-slate-300">{member.gender ?? "Not provided"}</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-white/10 flex justify-end mt-auto">
+                        {deletingId === member.memberId ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleDelete(member.memberId)}
+                              className="text-xs font-semibold bg-red-500 text-white hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors shadow-lg shadow-red-500/20"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => setDeletingId(null)}
+                              className="text-xs font-semibold text-slate-400 hover:text-white px-3 py-1.5 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeletingId(member.memberId)}
+                            className="flex items-center gap-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                          >
+                            <Trash2 size={14} />
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </SpotlightCard>
+                  ))}
                 </div>
               )}
             </>
           )}
         </>
       )}
-    </div>
+    </motion.div>
   );
 };
 

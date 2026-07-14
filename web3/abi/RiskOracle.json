@@ -1,0 +1,312 @@
+{
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_agentAddress",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "customerId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "riskScoreBps",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "riskLevel",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "guardianTriggered",
+          "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "name": "RiskScored",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "agentAddress",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "customerId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getLatestRisk",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "riskScoreBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "riskLevel",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bool",
+          "name": "guardianTriggered",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "customerId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getRiskHistoryLength",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "latestRisk",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "customerId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "riskScoreBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "riskLevel",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "conditionsHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "guardianTriggered",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "exists",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "customerId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "riskScoreBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "riskLevel",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "conditionsHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bool",
+          "name": "guardianTriggered",
+          "type": "bool"
+        }
+      ],
+      "name": "recordRiskScore",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "riskHistory",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "customerId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "riskScoreBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "riskLevel",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "conditionsHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "guardianTriggered",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "exists",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "scannedCustomerIds",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_newAgent",
+          "type": "address"
+        }
+      ],
+      "name": "setAgentAddress",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalCustomersScanned",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]
+}

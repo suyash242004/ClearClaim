@@ -1,4 +1,4 @@
-﻿using Com.Application.Domain.DataAccessContract;
+using Com.Application.Domain.DataAccessContract;
 using Com.Application.Domain.Entities;
 using Dapper;
 using Dapper.Contrib;
@@ -26,8 +26,9 @@ namespace Com.Application.Domain.ReadDataAccess
             try
             {
                 await conn.OpenAsync();
-                response.Records = await conn.QueryAsync<Customer>("SELECT * FROM customer");
-                response.Message = "Records are read successfully.";
+                var data = await conn.QueryAsync<Customer>("SELECT * FROM customer");
+                response.Records = data.ToList();
+                response.Message = "Records read successfully.";
                 response.ResponseCode = 200;
                 await conn.CloseAsync();
 
@@ -48,6 +49,27 @@ namespace Com.Application.Domain.ReadDataAccess
                 await conn.OpenAsync();
                 response.Record = await conn.QueryFirstOrDefaultAsync<Customer>(
                     "SELECT * FROM customer WHERE customer_id = @CustomerId", new { CustomerId = id });
+                response.Message = "Records are read successfully.";
+                response.ResponseCode = 200;
+                await conn.CloseAsync();
+
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+            return response;
+        }
+
+        async public Task<ResponseObject<Customer>> GetByEmailAsync(string email)
+        {
+            ResponseObject<Customer> response = new ResponseObject<Customer>();
+            try
+            {
+                await conn.OpenAsync();
+                response.Record = await conn.QueryFirstOrDefaultAsync<Customer>(
+                    "SELECT * FROM customer WHERE customer_email = @Email", new { Email = email });
                 response.Message = "Records are read successfully.";
                 response.ResponseCode = 200;
                 await conn.CloseAsync();

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Com.Application.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -59,6 +59,22 @@ public partial class MedicalInsuranceContext : DbContext
             entity.Property(e => e.Status)
                   .HasMaxLength(20)
                   .HasColumnName("status");
+
+            // AI Agent output column mappings
+            entity.Property(e => e.AiDecision)
+                  .HasMaxLength(20)
+                  .HasColumnName("ai_decision");
+            entity.Property(e => e.AiReasoning)
+                  .HasColumnName("ai_reasoning");
+            entity.Property(e => e.AiConfidence)
+                  .HasPrecision(5, 2)
+                  .HasColumnName("ai_confidence");
+            entity.Property(e => e.FraudScore)
+                  .HasColumnName("fraud_score");
+            entity.Property(e => e.TxHash)
+                  .HasMaxLength(100)
+                  .HasColumnName("tx_hash");
+
             entity.HasOne(d => d.Hospital).WithMany(p => p.Claims)
                 .HasForeignKey(d => d.HospitalId)
                 .OnDelete(DeleteBehavior.Restrict)
@@ -101,6 +117,11 @@ public partial class MedicalInsuranceContext : DbContext
             entity.Property(e => e.Profession)
                 .HasMaxLength(50)
                 .HasColumnName("profession");
+            entity.Property(e => e.Password)
+                .HasMaxLength(255)
+                .HasColumnName("password");
+            entity.Property(e => e.RiskScore)
+                .HasColumnName("risk_score");
         });
 
         modelBuilder.Entity<Familymember>(entity =>

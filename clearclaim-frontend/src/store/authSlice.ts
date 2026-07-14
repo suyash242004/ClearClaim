@@ -12,6 +12,7 @@ interface AuthState {
   role: "customer" | "admin" | "hospital" | null; // current logged in role
   userId: number | null; // customerId or hospitalId
   isLoggedIn: boolean; // is user logged in
+  walletAddress: string | null; // connected OKX wallet address
 }
 
 // Initial state — no one is logged in
@@ -19,6 +20,7 @@ const initialState: AuthState = {
   role: null,
   userId: null,
   isLoggedIn: false,
+  walletAddress: null,
 };
 
 const authSlice = createSlice({
@@ -45,12 +47,18 @@ const authSlice = createSlice({
       state.role = null;
       state.userId = null;
       state.isLoggedIn = false;
+      state.walletAddress = null;
+    },
+
+    // Action: called when OKX wallet connects
+    setWalletAddress(state, action: PayloadAction<string | null>) {
+      state.walletAddress = action.payload;
     },
   },
 });
 
 // Export actions to be used in components
-export const { login, logout } = authSlice.actions;
+export const { login, logout, setWalletAddress } = authSlice.actions;
 
 // Export reducer to be registered in store
 export default authSlice.reducer;

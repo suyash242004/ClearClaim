@@ -1,4 +1,4 @@
-﻿using Com.Application.Domain.DataAccessContract;
+using Com.Application.Domain.DataAccessContract;
 using Com.Application.Domain.Entities;
 using Dapper;
 using Dapper.Contrib;
@@ -48,7 +48,7 @@ namespace Com.Application.Domain.ReadDataAccess
                     EndDate = DateOnly.FromDateTime(x.end_date),
                     IsActive = x.is_active,
                     RenewalCount = x.renewal_count
-                });
+                }).ToList();
 
                 response.Message = "Records read successfully.";
                 response.ResponseCode = 200;

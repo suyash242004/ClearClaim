@@ -1,0 +1,185 @@
+{
+  "_format": "hh-sol-cache-2",
+  "files": {
+    "D:\\ClearClaim\\web3\\contracts\\InsuranceClaim.sol": {
+      "lastModificationDate": 1784034956646,
+      "contentHash": "2b8c46c98ffb3ae041a17e5101178f8c",
+      "sourceName": "contracts/InsuranceClaim.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "InsuranceClaim"
+      ]
+    },
+    "D:\\ClearClaim\\web3\\contracts\\HealthGuardian.sol": {
+      "lastModificationDate": 1784034959373,
+      "contentHash": "6beac50381c58e61593c4f96728012c1",
+      "sourceName": "contracts/HealthGuardian.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "HealthGuardian"
+      ]
+    },
+    "D:\\ClearClaim\\web3\\contracts\\RiskOracle.sol": {
+      "lastModificationDate": 1784034957968,
+      "contentHash": "4fe501cac4ab9a771e2e6a189c99fd93",
+      "sourceName": "contracts/RiskOracle.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "RiskOracle"
+      ]
+    },
+    "D:\\ClearClaim\\web3\\contracts\\HealthPassport.sol": {
+      "lastModificationDate": 1783841475225,
+      "contentHash": "fafc8e142586be35a4b122152654dca4",
+      "sourceName": "contracts/HealthPassport.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "HealthPassport"
+      ]
+    },
+    "D:\\ClearClaim\\web3\\contracts\\PremiumVault.sol": {
+      "lastModificationDate": 1784034960360,
+      "contentHash": "2ef590853a8ec46a44a14b37fbae10c5",
+      "sourceName": "contracts/PremiumVault.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "PremiumVault"
+      ]
+    }
+  }
+}

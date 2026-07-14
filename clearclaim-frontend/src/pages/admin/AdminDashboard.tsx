@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { readApi } from "../../services/axiosConfig";
-import { AgentHttpService, type ClaimDecision, type SSEEvent } from "../../services/AgentHttpService";
+import { AgentHttpService, type ClaimDecision, type SSEEvent, type RiskScanResult } from "../../services/AgentHttpService";
 import StatCard from "../../components/StatCard";
 import AgentStatusPanel, {
   type LogEntry, createLog,
@@ -13,7 +13,7 @@ import ClaimStatusChip from "../../components/ClaimStatusChip";
 import FraudScoreBadge from "../../components/FraudScoreBadge";
 import {
   FileText, Clock, CheckCircle, XCircle,
-  Bot, AlertTriangle, RotateCcw, Sparkles
+  Bot, AlertTriangle, RotateCcw, Sparkles, Zap, ShieldAlert, HeartPulse
 } from "lucide-react";
 
 interface DashboardStats {
@@ -41,10 +41,24 @@ export default function AdminDashboard() {
   const [agentResults, setAgentResults] = useState<Record<number, ClaimDecision>>({});
   const [lastRun, setLastRun] = useState<string | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [scanResults, setScanResults] = useState<RiskScanResult[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [orchestratingClaim, setOrchestratingClaim] = useState<number | null>(null);
   const sseCleanup = useRef<(() => void) | null>(null);
+  const logIdRef = useRef(0);
+
+  // Close any live SSE stream when the admin navigates away (no leaked connections)
+  useEffect(() => {
+    return () => {
+      if (sseCleanup.current) {
+        sseCleanup.current();
+        sseCleanup.current = null;
+      }
+    };
+  }, []);
 
   const addLog = (msg: string, type: LogEntry["type"]) =>
-    setLogs(prev => [...prev, createLog(Date.now(), msg, type)]);
+    setLogs(prev => [...prev, createLog(++logIdRef.current, msg, type)]);
 
   const loadData = async () => {
     setStatsLoading(true);
@@ -89,6 +103,58 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => { loadData(); }, []);
+
+  const runPredictiveScan = async () => {
+    setIsScanning(true);
+    addLog("Starting Nightly Predictive Risk Scan (Agent 5)...", "info");
+    try {
+      const res = await AgentHttpService.getPredictiveScan();
+      if (res.data) {
+        setScanResults(res.data);
+        addLog(`Scanned ${res.data.length} active patients. High-risk patients auto-assigned Health Guardian.`, "success");
+      }
+    } catch (e) {
+      addLog("Predictive Risk Scan failed.", "error");
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const orchestrateClaim = async (claimId: number) => {
+    setOrchestratingClaim(claimId);
+    addLog(`Initiating Smart Orchestrator for Claim #${claimId}...`, "info");
+    try {
+      const res = await AgentHttpService.orchestrateClaim(claimId);
+      if (res.data) {
+        const r = res.data;
+        // Print steps to terminal with slight delay
+        r.pipeline_steps.forEach((step, idx) => {
+          setTimeout(() => addLog(step, "processing"), idx * 250);
+        });
+        
+        // Update local state after steps print
+        setTimeout(() => {
+          const decision = (r.ai_decision as any) || (r.fast_reject ? "Reject" : "Flag");
+          setAgentResults(prev => ({
+            ...prev,
+            [claimId]: {
+              claim_id: claimId,
+              decision,
+              reasoning: r.ai_reasoning || "",
+              confidence_score: r.confidence_score || 0,
+              fraud_indicators: [],
+              tx_hash: r.tx_hash,
+            }
+          }));
+          addLog(`Pipeline complete. Final Decision: ${decision}`, decision === "Approve" ? "success" : "warning");
+        }, r.pipeline_steps.length * 250);
+      }
+    } catch (e) {
+      addLog(`Failed to orchestrate claim #${claimId}`, "error");
+    } finally {
+      setOrchestratingClaim(null);
+    }
+  };
 
   const runAIAgent = () => {
     // Cancel any existing stream
@@ -205,6 +271,22 @@ export default function AdminDashboard() {
             {isAgentRunning ? "AI Running…" : "Run AI Agent"}
           </GhastButton>
         </div>
+      </div>
+
+      {/* ── Action Bar ── */}
+      <div className="flex items-center gap-3 mb-6 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+        <button
+          onClick={runPredictiveScan}
+          disabled={isScanning}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+          style={{ background: "rgba(99, 102, 241, 0.15)", color: "#818CF8", border: "1px solid rgba(99, 102, 241, 0.3)" }}
+        >
+          {isScanning ? <span className="w-3.5 h-3.5 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" /> : <ShieldAlert size={16} />}
+          Run Predictive Risk Scan
+        </button>
+        <span className="text-xs" style={{ color: "#64748B" }}>
+          (Agent 5: Autonomous Nightly Radar)
+        </span>
       </div>
 
       {/* ── Stats row ── */}
@@ -336,10 +418,26 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   
-                  {decision !== "Pending" && (
+                  
+                  {decision !== "Pending" ? (
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded" style={{ background: "rgba(255,255,255,0.05)", color: dotColor }}>
                       {decision}
                     </span>
+                  ) : (
+                    <button
+                      onClick={() => orchestrateClaim(claim.claimId)}
+                      disabled={orchestratingClaim === claim.claimId || isAgentRunning}
+                      className="text-[10px] font-bold flex items-center gap-1 uppercase tracking-wider px-2 py-1 rounded transition-colors hover:bg-white/10"
+                      style={{ background: "rgba(255,255,255,0.05)", color: "#A78BFA" }}
+                      title="Smart Orchestrate (Agent 4)"
+                    >
+                      {orchestratingClaim === claim.claimId ? (
+                        <span className="w-3 h-3 border border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
+                      ) : (
+                        <Zap size={11} />
+                      )}
+                      Orchestrate
+                    </button>
                   )}
                 </motion.div>
               );
@@ -347,6 +445,64 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* ── Predictive Risk Radar (Agent 5) ── */}
+      {scanResults.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-8 space-y-4"
+        >
+          <div className="flex items-center gap-2">
+            <HeartPulse size={18} style={{ color: "#F43F5E" }} />
+            <h2 className="text-base font-bold" style={{ color: "#F8FAFC" }}>Predictive Risk Radar</h2>
+            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(244,63,94,0.1)", color: "#FB7185" }}>
+              {scanResults.length} Scanned
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {scanResults.map((scan) => (
+              <div key={scan.customer_id} className="card p-4 relative overflow-hidden">
+                {scan.guardian_triggered && (
+                  <div className="absolute top-0 right-0 px-2 py-1 bg-emerald-500/20 text-emerald-400 text-[9px] font-bold uppercase tracking-wider rounded-bl-lg">
+                    Guardian Triggered
+                  </div>
+                )}
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="font-semibold text-sm" style={{ color: "#F8FAFC" }}>{scan.customer_name}</p>
+                    <p className="text-xs" style={{ color: "#94A3B8" }}>ID: #{scan.customer_id}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold" style={{ color: scan.risk_score >= 0.65 ? "#EF4444" : scan.risk_score >= 0.4 ? "#F59E0B" : "#10B981" }}>
+                      {scan.risk_score.toFixed(2)}
+                    </p>
+                    <p className="text-[10px] uppercase tracking-wider" style={{ color: "#64748B" }}>Risk Score</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2 mb-3">
+                  <div className="text-xs">
+                    <span style={{ color: "#475569" }}>Predicted: </span>
+                    <span style={{ color: "#E2E8F0" }}>{scan.predicted_conditions.join(", ") || "None"}</span>
+                  </div>
+                  <div className="text-xs">
+                    <span style={{ color: "#475569" }}>Factors: </span>
+                    <span style={{ color: "#94A3B8" }}>{scan.risk_factors.join(", ") || "None"}</span>
+                  </div>
+                </div>
+                
+                <div className="p-2 rounded bg-white/5 text-xs">
+                  <span style={{ color: "#A78BFA" }}>Action: </span>
+                  <span style={{ color: "#CBD5E1" }}>{scan.recommended_action}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
     </motion.div>
   );
 }

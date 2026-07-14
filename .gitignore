@@ -60,3 +60,16 @@ bld/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# =========================
+# PYTHON / AGENTS
+# =========================
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+agents/.env
+web3/.env
