@@ -10,3 +10,4 @@ apscheduler==3.10.4
 langgraph>=1.0.0
 langgraph-checkpoint-sqlite>=3.0.0
 langchain-google-genai>=4.0.0
+numpy>=1.26.0
