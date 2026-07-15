@@ -8,7 +8,7 @@ import axios from "axios";
 
 // Axios instance for all READ operations (Dapper based APIs)
 export const readApi = axios.create({
-  baseURL: "http://127.0.0.1:5234", // ReadAPI HTTP port
+  baseURL: import.meta.env.VITE_READ_API_URL ?? "http://127.0.0.1:5234",
   headers: {
     "Content-Type": "application/json",
   },
@@ -16,7 +16,7 @@ export const readApi = axios.create({
 
 // Axios instance for all WRITE operations (EF Core based APIs)
 export const writeApi = axios.create({
-  baseURL: "http://127.0.0.1:5130", // WriteAPI HTTP port
+  baseURL: import.meta.env.VITE_WRITE_API_URL ?? "http://127.0.0.1:5130",
   headers: {
     "Content-Type": "application/json",
   },
