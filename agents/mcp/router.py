@@ -3,7 +3,7 @@ agents/mcp/router.py — OKX.AI ASP Compliance Layer
 
 Implements the Model Context Protocol (MCP) endpoints required by OKX.AI:
   GET  /.well-known/agent.json  — ASP identity card
-  GET  /mcp/tools               — tool manifest listing all 3 capabilities
+  GET  /mcp/tools               — tool manifest listing all 8 capabilities
   POST /mcp/invoke              — routes an OKX.AI tool call to the right agent function
   
 Payment (x402 protocol):
@@ -32,7 +32,7 @@ logger = logging.getLogger("clearclaim.mcp")
 # Fill AGENT_WALLET_ADDRESS in agents/.env after OKX.AI ASP registration
 AGENT_WALLET  = os.getenv("AGENT_WALLET_ADDRESS", "0xYOUR_OKX_AGENTIC_WALLET_ADDRESS")
 AGENT_NAME    = "ClearClaim AI"
-AGENT_VERSION = "1.0.0"
+AGENT_VERSION = "3.0.0"
 AGENT_DESC    = (
     "Autonomous medical insurance claim adjudicator. "
     "Detects fraud with Gemini 3.5 Flash, records every AI decision onchain "
@@ -300,7 +300,7 @@ async def agent_identity():
         "category":       "Finance Copilot",
         "wallet_address": AGENT_WALLET,
         "payment_currency": "USDT",
-        "blockchain":     "X Layer (chainId: 195)",
+        "blockchain":     "X Layer (chainId: 1952)",
         "tools":          [t["name"] for t in TOOLS],
         "pricing_url":    "http://localhost:8000/mcp/tools",
         "contact":        "clearclaim@okx.ai",

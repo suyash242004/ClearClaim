@@ -231,8 +231,19 @@ async def scan_all_customers():
     if not policies:
         return []
 
-    results = []
+    # One scan per CUSTOMER, not per policy — a customer with 3 policies was
+    # being scanned 3 times (3× Gemini cost, 3 duplicate onchain writes).
+    seen_customers: set = set()
+    unique_policies = []
     for policy in policies:
+        cid = policy.get("customer_id")
+        if cid in seen_customers:
+            continue
+        seen_customers.add(cid)
+        unique_policies.append(policy)
+
+    results = []
+    for policy in unique_policies:
         result = await _scan_customer(policy)
         if result:
             results.append(result)

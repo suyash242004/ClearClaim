@@ -3,12 +3,17 @@ agents/main.py — ClearClaim AI Agent Gateway
 Unified FastAPI app — all 11 agents on port 8000.
 
 Agents:
-  1. Claim Processor   — Gemini autonomous claim adjudication + SSE stream
-  2. Fraud Detector    — Algorithmic 0-100 risk scoring
-  3. Policy Advisor    — Gemini plan recommendation
-  4. Orchestrator      — Central pipeline router (chains agents)
-  5. Predictive Risk   — Nightly autonomous patient risk scanning
-  6. Health Guardian   — Personalized 90-day preventive care plans
+  1. Claim Processor      — Gemini adjudication + SSE stream
+  2. Fraud Detector       — Algorithmic 0-100 risk scoring
+  3. Policy Advisor       — Gemini + RAG plan recommendation
+  4. Orchestrator         — Legacy pipeline router
+  5. Predictive Risk      — Nightly autonomous risk scanning
+  6. Health Guardian      — 90-day preventive care plans
+  7. Hospital Assistant   — ICD-10 coding + pre-authorization
+  8. Health Passport      — Soulbound onchain health record
+  9. Chat Concierge       — Tool-calling assistant (6 tools)
+ 10. RLHF Self-Learning   — Learns rules from human overrides
+ 11. LangGraph Orchestrator — Checkpointed, human-in-the-loop pipeline
 """
 import sys
 import os
@@ -55,11 +60,15 @@ def _start_scheduler():
 
         scheduler = AsyncIOScheduler()
 
+        # On Render/other hosts uvicorn binds $PORT, not 8000 — the scheduler
+        # must call the same port this process is actually serving on.
+        self_base = f"http://localhost:{os.getenv('PORT', '8000')}"
+
         async def auto_process_claims():
             logger.info("[Scheduler] Starting auto-processing of pending claims...")
             try:
                 async with httpx.AsyncClient(timeout=120.0) as client:
-                    res = await client.post("http://localhost:8000/agent/process-claims")
+                    res = await client.post(f"{self_base}/agent/process-claims")
                     results = res.json()
                     approved = sum(1 for r in results if r.get("decision") == "Approve")
                     rejected = sum(1 for r in results if r.get("decision") == "Reject")
@@ -76,7 +85,7 @@ def _start_scheduler():
             logger.info("[Scheduler] Starting nightly predictive risk scan...")
             try:
                 async with httpx.AsyncClient(timeout=120.0) as client:
-                    res = await client.get("http://localhost:8000/agent/predictive-scan")
+                    res = await client.get(f"{self_base}/agent/predictive-scan")
                     results = res.json()
                     high_risk = sum(1 for r in results if r.get("risk_score", 0) >= 0.65)
                     logger.info(
@@ -188,7 +197,7 @@ def health_check():
         "observability": "GET /agent/metrics | GET /agent/traces/{claim_id} | GET /agent/graph/checkpoints/{claim_id}",
         "workflow_engine": "LangGraph 1.x — SQLite-checkpointed, human-in-the-loop, IRDAI rules gate",
         "mcp":        "GET /mcp/tools | POST /mcp/invoke | GET /.well-known/agent.json",
-        "blockchain": "X Layer Testnet (chainId: 195)",
+        "blockchain": "X Layer Testnet (chainId: 1952)",
         "llm":        "gemini-3.5-flash",
         "scheduler":  "APScheduler — auto-process claims every 30 mins, nightly risk scan at 02:00 AM",
     }

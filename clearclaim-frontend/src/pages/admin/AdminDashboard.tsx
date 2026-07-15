@@ -70,7 +70,9 @@ export default function AdminDashboard() {
       const d = dashRes.data?.record;
       if (d) {
         setStats({
-          totalClaims: d.totalClaims ?? 0,
+          // API sends the three status counts — total is their sum
+          totalClaims: d.totalClaims ??
+            ((d.pendingClaims ?? 0) + (d.approvedClaims ?? 0) + (d.rejectedClaims ?? 0)),
           pendingClaims: d.pendingClaims ?? 0,
           approvedClaims: d.approvedClaims ?? 0,
           rejectedClaims: d.rejectedClaims ?? 0,
@@ -163,7 +165,7 @@ export default function AdminDashboard() {
     setIsAgentRunning(true);
     setLogs([]);
     addLog("Initializing ClearClaim AI Agent v1.0…", "info");
-    addLog(`Connecting to Gemini 2.5 Flash via SSE stream…`, "info");
+    addLog(`Connecting to Gemini 3.5 Flash via SSE stream…`, "info");
 
     const cleanup = AgentHttpService.streamProcessClaims(
       // Per-event handler
@@ -203,7 +205,8 @@ export default function AdminDashboard() {
           const dashRes = await readApi.get("/api/admin/dashboard");
           const d = dashRes.data?.record;
           if (d) setStats({
-            totalClaims:    d.totalClaims ?? 0,
+            totalClaims: d.totalClaims ??
+              ((d.pendingClaims ?? 0) + (d.approvedClaims ?? 0) + (d.rejectedClaims ?? 0)),
             pendingClaims:  d.pendingClaims ?? 0,
             approvedClaims: d.approvedClaims ?? 0,
             rejectedClaims: d.rejectedClaims ?? 0,

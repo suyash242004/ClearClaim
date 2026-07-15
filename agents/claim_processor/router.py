@@ -55,6 +55,63 @@ def _write_ai_cols_to_db(claim_id: int, decision: str, reasoning: str,
         conn.close()
 
 
+async def _fetch_pending_claims(client: httpx.AsyncClient) -> list:
+    """
+    Pending claims via ReadAPI, falling back to a direct DB query.
+    The fallback keeps 'Run AI Agent' working on deployments where the
+    READ_API env var isn't set (defaults to localhost and fails).
+    """
+    try:
+        res = await client.get(f"{READ_API}/api/admin/claims/pending")
+        res.raise_for_status()
+        return res.json().get("records", []) or []
+    except Exception as e:
+        print(f"[ClaimProcessor] ReadAPI unreachable ({e}) — reading pending claims from DB directly.")
+        from psycopg2.extras import RealDictCursor
+        conn = psycopg2.connect(
+            host=DB_HOST, port=DB_PORT,
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD
+        )
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT claim_id, policy_id, hospital_id, claim_date, claim_amount, "
+                    "disease, status, doctor_name, description "
+                    "FROM claims WHERE status = 'Pending' ORDER BY claim_id"
+                )
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+        return [{
+            "claimId":     r["claim_id"],
+            "policyId":    r["policy_id"],
+            "hospitalId":  r["hospital_id"],
+            "claimDate":   str(r["claim_date"] or ""),
+            "claimAmount": float(r["claim_amount"] or 0),
+            "disease":     r["disease"],
+            "status":      r["status"],
+            "doctorName":  r["doctor_name"],
+            "description": r["description"],
+        } for r in rows]
+
+
+def _write_status_to_db(claim_id: int, decision: str):
+    """Direct status update — used when the WriteAPI is unreachable so a
+    decided claim can never get stuck in Pending."""
+    new_status = "Approved" if decision == "Approve" else "Rejected"
+    conn = psycopg2.connect(
+        host=DB_HOST, port=DB_PORT,
+        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD
+    )
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE claims SET status = %s WHERE claim_id = %s",
+                        (new_status, claim_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 async def _process_single_claim(claim: dict, client: httpx.AsyncClient) -> ClaimDecisionResponse:
     """Core logic: fetch context, call Gemini, write decision back."""
     claim_id   = claim.get("claimId")
@@ -126,14 +183,21 @@ async def _process_single_claim(claim: dict, client: httpx.AsyncClient) -> Claim
     confidence = float(ai.get("confidence_score", 0.0))
     indicators = ai.get("fraud_indicators", [])
 
-    # Write decision to .NET WriteAPI
+    # Write decision to .NET WriteAPI — direct DB fallback if unreachable
     try:
         if decision == "Approve":
-            await client.put(f"{WRITE_API}/api/admin/claims/approve/{claim_id}")
+            r = await client.put(f"{WRITE_API}/api/admin/claims/approve/{claim_id}")
+            r.raise_for_status()
         elif decision == "Reject":
-            await client.put(f"{WRITE_API}/api/admin/claims/reject/{claim_id}")
+            r = await client.put(f"{WRITE_API}/api/admin/claims/reject/{claim_id}")
+            r.raise_for_status()
     except Exception as e:
-        print(f"[ClaimProcessor] WriteAPI call failed for claim {claim_id}: {e}")
+        print(f"[ClaimProcessor] WriteAPI failed for claim {claim_id} ({e}) — writing status to DB directly.")
+        if decision in ("Approve", "Reject"):
+            try:
+                _write_status_to_db(claim_id, decision)
+            except Exception as e2:
+                print(f"[ClaimProcessor] Direct DB status write also failed: {e2}")
 
     # Try blockchain recording (import here to avoid circular or missing deps)
     tx_hash = None
@@ -161,9 +225,7 @@ async def process_pending_claims():
     """Batch: fetch all pending claims, run Gemini on each, return full list."""
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            res = await client.get(f"{READ_API}/api/admin/claims/pending")
-            res.raise_for_status()
-            claims = res.json().get("records", [])
+            claims = await _fetch_pending_claims(client)
         except Exception as e:
             from fastapi import HTTPException
             raise HTTPException(status_code=500, detail=f"Failed to fetch pending claims: {e}")
@@ -190,12 +252,10 @@ async def stream_process_claims():
                           "reasoning": "...", "confidence_score": 0.95, "tx_hash": "0x..."}
     """
     async def event_generator() -> AsyncGenerator[str, None]:
-        # Fetch pending claims
+        # Fetch pending claims (ReadAPI with direct-DB fallback)
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                res = await client.get(f"{READ_API}/api/admin/claims/pending")
-                res.raise_for_status()
-                claims = res.json().get("records", [])
+                claims = await _fetch_pending_claims(client)
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
             return
@@ -204,7 +264,7 @@ async def stream_process_claims():
             yield f"data: {json.dumps({'type': 'complete', 'message': 'No pending claims to process.'})}\n\n"
             return
 
-        yield f"data: {json.dumps({'type': 'start', 'total': len(claims), 'message': f'Processing {len(claims)} pending claims via Gemini 2.5 Flash…'})}\n\n"
+        yield f"data: {json.dumps({'type': 'start', 'total': len(claims), 'message': f'Processing {len(claims)} pending claims via Gemini 3.5 Flash…'})}\n\n"
         await asyncio.sleep(0.1)
 
         results = []

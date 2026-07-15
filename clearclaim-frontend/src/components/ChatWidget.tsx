@@ -65,7 +65,7 @@ export default function ChatWidget() {
         customer_id: userId,
         message: textToSend,
         history: historyPayload
-      }, { timeout: 90000 });
+      }, { timeout: 180000 }); // Render cold start + multi-step Gemini tool calls can exceed 90s
 
       const assistantMessage: Message = {
         sender: "assistant",

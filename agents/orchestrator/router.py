@@ -269,7 +269,7 @@ def orchestrator_status():
             {"id": 5, "name": "Predictive Risk",    "endpoint": "GET /agent/predictive-scan",         "type": "Gemini 3.5 Flash", "status": "active"},
             {"id": 6, "name": "Health Guardian",    "endpoint": "POST /agent/health-guardian/{id}",   "type": "Gemini 3.5 Flash", "status": "active"},
         ],
-        "blockchain": "X Layer Testnet (chainId: 195)",
+        "blockchain": "X Layer Testnet (chainId: 1952)",
         "llm": "Gemini 3.5 Flash (google-generativeai)",
         "marketplace": "OKX.AI Genesis Hackathon 2026",
     }
