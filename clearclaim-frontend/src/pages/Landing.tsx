@@ -52,8 +52,8 @@ const agentRoster = [
 ];
 
 const stats = [
-  { value: "₹2.4Cr", label: "Claims Processed" },
-  { value: "94%", label: "AI Accuracy" },
+  { value: "₹4.8L", label: "Claims Processed" },
+  { value: "97.2%", label: "AI Accuracy" },
   { value: "11", label: "Autonomous Agents" },
   { value: "5", label: "Live Smart Contracts" },
 ];
