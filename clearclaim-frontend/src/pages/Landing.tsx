@@ -128,9 +128,10 @@ export default function Landing() {
                 className="text-base leading-relaxed max-w-md mb-10"
                 style={{ color: "#888899" }}
               >
-                Eleven AI agents process, verify, and settle medical insurance
-                claims onchain. Autonomous by default — a human steps in only
-                when the AI isn't sure. Every decision, immutable.
+                Powered by 11 specialized AI agents, ClearClaim autonomously processes,
+                verifies, and settles medical insurance claims onchain. Designed for maximum efficiency,
+                human reviewers step in only for complex edge cases. Every decision is cryptographically secured
+                and immutable on X Layer.
               </p>
 
               {/* CTAs */}
