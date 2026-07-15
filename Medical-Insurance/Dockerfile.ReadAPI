@@ -1,0 +1,25 @@
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+EXPOSE 8080
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy all project files
+COPY Com.Application.Domain.Entities/ Com.Application.Domain.Entities/
+COPY Com.Application.Domain.Contract/ Com.Application.Domain.Contract/
+COPY Com.Application.Domain.DataAccessContract/ Com.Application.Domain.DataAccessContract/
+COPY Com.Application.Domain.ReadDataAccess/ Com.Application.Domain.ReadDataAccess/
+COPY Com.Application.Domain.ReadRepository/ Com.Application.Domain.ReadRepository/
+COPY Com.Application.Domain.ReadAPI/ Com.Application.Domain.ReadAPI/
+
+# Restore and publish
+RUN dotnet restore Com.Application.Domain.ReadAPI/Com.Application.Domain.ReadAPI.csproj
+RUN dotnet publish Com.Application.Domain.ReadAPI/Com.Application.Domain.ReadAPI.csproj -c Release -o /app/publish --no-restore
+
+FROM base AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENTRYPOINT ["dotnet", "Com.Application.Domain.ReadAPI.dll"]

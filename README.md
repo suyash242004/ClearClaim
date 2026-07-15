@@ -90,35 +90,85 @@ Covered by a **70-test Hardhat suite** (`web3/test/`, local network) — events,
 
 ```
 ClearClaim/
-├── clearclaim-frontend/          React 18 + TS + Vite + Tailwind (code-split, 3 role portals)
+│
+├── clearclaim-frontend/                    React 18 + TypeScript + Vite + Tailwind + Framer Motion
+│   ├── .env.example                        VITE_AGENT_API_URL (deployed gateway URL)
 │   └── src/
-│       ├── pages/                customer/ · admin/ · hospital/ · Landing, Login, …
-│       ├── components/           ChatWidget, DecisionReplayModal, PaymentModal, …
-│       ├── services/             typed HTTP clients (ReadAPI, WriteAPI, Agent gateway)
-│       └── store/                Redux (persisted auth)
+│       ├── App.tsx                         code-split routes (React.lazy) for all 3 role portals
+│       ├── pages/
+│       │   ├── Landing.tsx                 product landing — hero, 11-agent roster, live stats
+│       │   ├── Login.tsx · Register.tsx    role-based auth (customer / admin / hospital)
+│       │   ├── DbExplorer.tsx              admin CRUD over the 7 core tables
+│       │   ├── customer/                   Dashboard · BrowsePlans · PurchasePolicy · MyPolicies
+│       │   │                               SubmitClaim (3-step wizard + fraud preview) · MyClaims
+│       │   │                               FamilyMembers
+│       │   ├── admin/                      AdminDashboard (SSE terminal) · PendingClaims
+│       │   │                               ReviewQueue (human-in-the-loop) · AgentEconomics (P&L)
+│       │   │                               CustomerSearch
+│       │   └── hospital/                   HospitalDashboard · HospitalClaims (AI clinical review)
+│       │                                   HospitalPatientLookup · HospitalNetwork
+│       ├── components/                     ChatWidget · DecisionReplayModal (audit-trail replay)
+│       │                                   PaymentModal (OKB → PremiumVault) · FraudScoreBadge
+│       │                                   TxHashLink · AgentStatusPanel · Navbar · …
+│       ├── services/                       typed HTTP clients — AgentHttpService (gateway :8000),
+│       │                                   axiosConfig (ReadAPI :5234 / WriteAPI :5130), per-domain services
+│       └── store/                          Redux Toolkit with persisted auth slice
 │
-├── Medical-Insurance/            .NET 8 — Clean Architecture, CQRS (9 projects)
-│   ├── …ReadAPI/                 Dapper reads  → :5234
-│   ├── …WriteAPI/                EF Core writes → :5130
-│   └── …{Contracts,Entities,Repositories,DataAccess}/
+├── Medical-Insurance/                      .NET 8 — Clean Architecture, CQRS (9 projects)
+│   ├── Com.Application.Domain.ReadAPI/     Dapper read side → :5234 (queries, dashboards, search)
+│   ├── Com.Application.Domain.WriteAPI/    EF Core write side → :5130 (register, purchase, claims,
+│   │                                       approvals) + FluentValidation
+│   ├── Com.Application.Domain.Contract/            service interfaces
+│   ├── Com.Application.Domain.DataAccessContract/  data-access interfaces
+│   ├── Com.Application.Domain.Entities/            domain models (Customer, Claim, Policy, …)
+│   ├── Com.Application.Domain.Read{Repository,DataAccess}/    Dapper implementations
+│   └── Com.Application.Domain.Write{Respository,DataAccess}/  EF Core implementations
 │
-├── agents/                       Python 3.11 + FastAPI gateway → :8000
-│   ├── main.py                   mounts all 11 agents + APScheduler (30-min claims, 2 AM risk scan)
-│   ├── orchestrator/             graph.py (LangGraph workflow) + REST routers
-│   ├── economics/                agentledger P&L endpoints
-│   ├── observability/            /agent/metrics + /agent/traces (decision replay)
-│   ├── mcp/                      OKX.AI ASP layer — /mcp/tools, /mcp/invoke, agent.json
-│   ├── <agent>/router.py         one folder per agent
-│   └── shared/                   db, gemini client (rotation + model fallback), business_rules,
-│                                 blockchain bridge, RAG, prompts, metrics
+├── agents/                                 Python 3.11 + FastAPI unified gateway → :8000
+│   ├── main.py                             mounts all 11 agents · APScheduler (30-min auto-claims,
+│   │                                       2 AM predictive scan) · env-driven CORS
+│   ├── requirements.txt · .env.example     deps + environment template (Render-ready)
+│   ├── orchestrator/
+│   │   ├── graph.py                        ★ LangGraph workflow — ClaimState, 9 nodes, conditional
+│   │   │                                   routing, SQLite checkpointing, human-interrupt
+│   │   ├── graph_router.py                 /agent/graph/* — run, state, resume, checkpoints, queue
+│   │   └── router.py                       legacy httpx pipeline (fallback)
+│   ├── claim_processor/                    Gemini adjudication + SSE stream (Agent 1)
+│   ├── fraud_detector/                     algorithmic 0–100 scoring, no LLM (Agent 2)
+│   ├── policy_advisor/                     RAG-grounded plan recommendation (Agent 3)
+│   ├── predictive_risk/                    nightly risk scans (Agent 5)
+│   ├── health_guardian/                    90-day care plans, auto-triggered (Agent 6)
+│   ├── hospital_assistant/                 ICD-10 coding + rules-gated pre-auth (Agent 7)
+│   ├── health_passport/                    soulbound record mint/read (Agent 8)
+│   ├── chat_agent/                         tool-calling concierge, 6 tools (Agent 9)
+│   ├── rlhf/ + rlhf_pipeline.py            learns rules from human overrides (Agent 10)
+│   ├── plan_hospital/                      plan↔hospital network management
+│   ├── economics/                          agentledger P&L — /pnl, /leaderboard, /ledger
+│   ├── observability/                      /agent/metrics + /agent/traces (flight recorder)
+│   ├── mcp/                                OKX.AI ASP layer — /.well-known/agent.json,
+│   │                                       /mcp/tools (8 priced tools), /mcp/invoke (books ledger)
+│   └── shared/                             db.py (Postgres) · gemini_client.py (key rotation +
+│                                           model fallback) · business_rules.py (IRDAI engine) ·
+│                                           blockchain.py (web3 bridge) · rag.py (vector search) ·
+│                                           prompts.py · metrics.py · config.py
 │
-├── web3/                         Hardhat — 5 contracts, 70 tests, deploy scripts, ABIs
+├── web3/                                   Hardhat (Solidity 0.8.20, X Layer testnet 1952)
+│   ├── contracts/                          InsuranceClaim · RiskOracle · HealthGuardian ·
+│   │                                       HealthPassport · PremiumVault
+│   ├── test/                               70-test suite (events, access control, edge cases)
+│   ├── scripts/                            deploy.js · deploy_vault.js · extract_abi.js
+│   ├── abi/                                extracted ABIs consumed by the Python bridge
+│   └── deployments.json                    live addresses per contract
 │
-├── database/                     PostgreSQL schema, migrations, seed data, backup.sql
-│                                 (production DB hosted on Neon)
+├── database/                               PostgreSQL 16 (production on Neon)
+│   ├── MedicalInsurance.sql                schema — 7 core tables + business-rule triggers
+│   ├── migration_001.sql · migration_ai.sql        AI columns (ai_decision, fraud_score, tx_hash…)
+│   ├── seed_demo_data.sql · realistic_insurance_plans_2026.sql · insert_more_plans.sql
+│   └── backup.sql                          Neon snapshot
 │
-├── START_ALL_SERVICES.bat        one-click local boot (both APIs + agents + frontend)
-└── test_services.ps1             health check across all services
+├── docs/                                   architecture diagrams (class + workflow)
+├── START_ALL_SERVICES.bat                  one-click local boot (APIs + agents + frontend)
+└── test_services.ps1                       health check across all services
 ```
 
 ---

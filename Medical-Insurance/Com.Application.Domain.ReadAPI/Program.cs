@@ -77,12 +77,9 @@ var app = builder.Build();
 // Apply CORS policy before authorization and controller mapping
 app.UseCors("AllowReactApp");
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Enable Swagger in all environments for API discoverability
+app.UseSwagger();
+app.UseSwaggerUI();
 
 //app.UseHttpsRedirection();
 
