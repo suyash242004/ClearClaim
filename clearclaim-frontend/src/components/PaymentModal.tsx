@@ -98,7 +98,7 @@ export default function PaymentModal({ plan, onClose, onSuccess }: PaymentModalP
             params: [
               {
                 from: walletAddress,
-                to: "0x7Dc16253b0CaDE34e4562608d0929224175175B4", // PremiumVault
+                to: "0xd97177B7268624b4949fd265245E74A51633bcd0", // PremiumVault — live on X Layer testnet (chainId 1952)
                 value: "0x38d7ea4c68000", 
                 data: dataPayload
               },
@@ -172,7 +172,7 @@ export default function PaymentModal({ plan, onClose, onSuccess }: PaymentModalP
               <h3 className="text-lg font-bold text-white mb-2">{plan.planName}</h3>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-400">Total Premium</span>
-                <span className="font-bold text-indigo-400 text-lg">₹{plan.premiumAmount.toLocaleString()}</span>
+                <span className="font-bold text-indigo-400 text-lg">₹{plan.premiumAmount.toLocaleString("en-IN")}</span>
               </div>
             </div>
 
@@ -265,7 +265,7 @@ export default function PaymentModal({ plan, onClose, onSuccess }: PaymentModalP
                 className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900/50 disabled:text-slate-500 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
               >
                 {loading ? <Loader2 className="animate-spin" /> : null}
-                {loading ? "Processing..." : `Pay ₹${plan.premiumAmount.toLocaleString()}`}
+                {loading ? "Processing..." : `Pay ₹${plan.premiumAmount.toLocaleString("en-IN")}`}
               </button>
             )}
           </div>

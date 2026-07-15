@@ -24,16 +24,16 @@ export default function FraudScoreBadge({ score, showLabel = true }: Props) {
     : isMed
     ? "rgba(255,184,0,0.12)"
     : "rgba(255,71,87,0.12)";
-  const dot = isLow ? "🟢" : isMed ? "🟡" : "🔴";
   const label = isLow ? "Low" : isMed ? "Medium" : "High";
 
   return (
     <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold"
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap"
       style={{ background: bg, color, border: `1px solid ${color}30` }}
     >
-      {dot} {score}
-      {showLabel && <span className="opacity-70 ml-0.5">· {label}</span>}
+      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+      <span>{score}</span>
+      {showLabel && <span className="opacity-70">· {label}</span>}
     </span>
   );
 }

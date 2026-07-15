@@ -1,8 +1,13 @@
 import axios from "axios";
 
-// Agent API — Python FastAPI running on port 8000 (unified gateway)
+// Agent API — Python FastAPI unified gateway.
+// Deployed URL comes from VITE_AGENT_API_URL (e.g. https://clearclaim-agents.onrender.com);
+// falls back to localhost for local development.
+export const AGENT_API_URL: string =
+  import.meta.env.VITE_AGENT_API_URL ?? "http://127.0.0.1:8000";
+
 const agentApi = axios.create({
-  baseURL: "http://127.0.0.1:8000",
+  baseURL: AGENT_API_URL,
   timeout: 120000, // 2-min timeout for Gemini processing
   headers: { "Content-Type": "application/json" },
 });
@@ -237,7 +242,7 @@ export const AgentHttpService = {
     onComplete: () => void,
     onError: (err: string) => void
   ): (() => void) => {
-    const es = new EventSource("http://127.0.0.1:8000/agent/process-claims/stream");
+    const es = new EventSource(`${AGENT_API_URL}/agent/process-claims/stream`);
 
     es.onmessage = (e) => {
       try {

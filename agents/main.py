@@ -130,13 +130,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS: allow local frontend + OKX.AI marketplace
+# CORS: local frontend + OKX.AI marketplace + deployed frontend (FRONTEND_ORIGIN env,
+# e.g. https://clearclaim.vercel.app — set this on Render alongside the DB vars)
+_extra_origins = [o.strip() for o in os.getenv("FRONTEND_ORIGIN", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_origins=[
         "https://www.okx.ai",
         "https://okx.ai",
+        *_extra_origins,
     ],
     allow_credentials=True,
     allow_methods=["*"],

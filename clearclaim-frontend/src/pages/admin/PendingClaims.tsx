@@ -278,22 +278,28 @@ export default function PendingClaims() {
                             <button
                               onClick={() => runGraphOnClaim(claim.claimId)}
                               disabled={graphRunning === claim.claimId}
-                              className="p-1.5 rounded-lg transition-colors"
+                              className="px-2 py-1.5 rounded-lg transition-colors flex items-center gap-1 hover:brightness-125 disabled:opacity-60"
                               style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.25)" }}
-                              title="Run LangGraph pipeline (checkpointed)"
+                              title="Run the checkpointed LangGraph adjudication pipeline on this claim"
+                              aria-label={`Run LangGraph pipeline on claim ${claim.claimId}`}
                             >
                               {graphRunning === claim.claimId
                                 ? <RefreshCw size={12} className="animate-spin" style={{ color: "#A5B4FC" }} />
                                 : <GitBranch size={12} style={{ color: "#A5B4FC" }} />
                               }
+                              <span className="text-[10px] font-semibold" style={{ color: "#A5B4FC" }}>
+                                {graphRunning === claim.claimId ? "Running…" : "Graph"}
+                              </span>
                             </button>
                             <button
                               onClick={() => setReplayClaim(claim.claimId)}
-                              className="p-1.5 rounded-lg transition-colors"
+                              className="px-2 py-1.5 rounded-lg transition-colors flex items-center gap-1 hover:brightness-125"
                               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
-                              title="Replay AI Decision (flight recorder)"
+                              title="Replay the AI decision step-by-step (flight recorder)"
+                              aria-label={`Replay AI decision for claim ${claim.claimId}`}
                             >
                               <History size={12} style={{ color: "#94A3B8" }} />
+                              <span className="text-[10px] font-semibold" style={{ color: "#94A3B8" }}>Replay</span>
                             </button>
                             <button
                               onClick={() => manualAction(claim.claimId, "approve")}

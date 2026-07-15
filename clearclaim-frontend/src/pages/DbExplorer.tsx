@@ -1,11 +1,14 @@
 // DbExplorer.tsx
-// Standalone Database Explorer — accessible from Login page
-// Full CRUD on all 6 tables using ReadAPI + WriteAPI
-// No authentication required
+// Standalone Database Explorer — admin "Manage Data" screen
+// Full CRUD on the 7 core business tables using ReadAPI + WriteAPI.
+// The 3 agent-side tables (patientinterventions, agentlearninglog, agentledger)
+// are intentionally NOT here — they are AI-internal and surfaced elsewhere
+// (Customer Dashboard care plan, Review Queue, Agent Economics).
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { readApi, writeApi } from "../services/axiosConfig";
+import { AGENT_API_URL } from "../services/AgentHttpService";
 import {
   User, FileText, Building2, Shield, ClipboardList,
   Users, Search, Plus, Pencil, Trash2, ArrowLeft,
@@ -18,6 +21,7 @@ interface ColDef {
   label: string;
   type: "text" | "number" | "boolean" | "date";
   readOnly?: boolean;
+  masked?: boolean; // shown as •••• in the grid, editable in the modal
 }
 
 interface TableConfig {
@@ -48,6 +52,8 @@ const TABLES: TableConfig[] = [
       { key: "profession", label: "Profession", type: "text" },
       { key: "bloodGroup", label: "Blood Group", type: "text" },
       { key: "historicalDisease", label: "Disease History", type: "text" },
+      { key: "password", label: "Password", type: "text", masked: true },
+      { key: "riskScore", label: "Risk Score", type: "number", readOnly: true }, // set by AI risk agent
     ],
     getAll: () => readApi.get("/api/CustomerRead").then(r => r.data),
     getById: (id) => readApi.get(`/api/CustomerRead/${id}`).then(r => r.data),
@@ -114,6 +120,12 @@ const TABLES: TableConfig[] = [
       { key: "status", label: "Status", type: "text" },
       { key: "doctorName", label: "Doctor", type: "text" },
       { key: "description", label: "Description", type: "text" },
+      // AI agent output columns — written by the Python claim processor, read-only here
+      { key: "aiDecision", label: "AI Decision", type: "text", readOnly: true },
+      { key: "aiConfidence", label: "AI Confidence", type: "number", readOnly: true },
+      { key: "fraudScore", label: "Fraud Score", type: "number", readOnly: true },
+      { key: "aiReasoning", label: "AI Reasoning", type: "text", readOnly: true },
+      { key: "txHash", label: "Tx Hash", type: "text", readOnly: true },
     ],
     getAll: () => readApi.get("/api/ClaimRead").then(r => r.data),
     getById: (id) => readApi.get(`/api/ClaimRead/${id}`).then(r => r.data),
@@ -143,14 +155,14 @@ const TABLES: TableConfig[] = [
       { key: "planId", label: "Plan ID", type: "number" },
       { key: "hospitalId", label: "Hospital ID", type: "number" },
     ],
-    getAll: () => writeApi.get("/agent/plan-hospital", { baseURL: "http://localhost:8000" }).then(r => r.data),
-    getById: (id) => writeApi.get("/agent/plan-hospital", { baseURL: "http://localhost:8000" }).then(r => {
+    getAll: () => writeApi.get("/agent/plan-hospital", { baseURL: AGENT_API_URL }).then(r => r.data),
+    getById: (id) => writeApi.get("/agent/plan-hospital", { baseURL: AGENT_API_URL }).then(r => {
        const rec = r.data.records?.find((x: any) => x.planId === id);
        return { record: rec };
     }),
-    create: (d) => writeApi.post("/agent/plan-hospital", d, { baseURL: "http://localhost:8000" }).then(r => r.data),
-    update: (id, d) => writeApi.post("/agent/plan-hospital", d, { baseURL: "http://localhost:8000" }).then(r => r.data),
-    remove: (id, record) => writeApi.delete(`/agent/plan-hospital/${record.planId}/${record.hospitalId}`, { baseURL: "http://localhost:8000" }).then(r => r.data),
+    create: (d) => writeApi.post("/agent/plan-hospital", d, { baseURL: AGENT_API_URL }).then(r => r.data),
+    update: (id, d) => writeApi.post("/agent/plan-hospital", d, { baseURL: AGENT_API_URL }).then(r => r.data),
+    remove: (id, record) => writeApi.delete(`/agent/plan-hospital/${record.planId}/${record.hospitalId}`, { baseURL: AGENT_API_URL }).then(r => r.data),
   },
 ];
 
@@ -374,8 +386,9 @@ const DbExplorer = () => {
           {val ? "Yes" : "No"}
         </span>
       );
-    if (val === null || val === undefined) return <span style={{ color: "#475569" }}>—</span>;
-    return <span className="truncate max-w-[140px] block">{String(val)}</span>;
+    if (val === null || val === undefined || val === "") return <span style={{ color: "#475569" }}>—</span>;
+    if (col.masked) return <span className="font-mono tracking-widest" style={{ color: "#94A3B8" }} title="Hidden — open Edit to view">••••••</span>;
+    return <span className="truncate max-w-[140px] block" title={String(val)}>{String(val)}</span>;
   };
 
   return (

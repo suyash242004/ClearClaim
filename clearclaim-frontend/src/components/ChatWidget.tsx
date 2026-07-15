@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSelector } from "react-redux";
 import type { RootState } from "../store/store";
 import axios from "axios";
-import { Bot, X, Send, MessageSquare, Loader, Sparkles } from "lucide-react";
+import { AGENT_API_URL } from "../services/AgentHttpService";
+import { Bot, X, Send, MessageSquare, Loader, Sparkles, RefreshCw } from "lucide-react";
 
 interface Message {
   sender: "user" | "assistant";
@@ -25,6 +26,8 @@ export default function ChatWidget() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  // Remembers the last message that failed so the user can retry with one tap
+  const [lastFailed, setLastFailed] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -40,12 +43,15 @@ export default function ChatWidget() {
   // Only render if customer is logged in
   if (!isLoggedIn || role !== "customer" || !userId) return null;
 
-  const sendMessage = async (textToSend: string) => {
-    if (!textToSend.trim()) return;
-    
-    const userMessage: Message = { sender: "user", text: textToSend };
-    setMessages(prev => [...prev, userMessage]);
+  const sendMessage = async (textToSend: string, isRetry = false) => {
+    if (!textToSend.trim() || loading) return;
+
+    if (!isRetry) {
+      const userMessage: Message = { sender: "user", text: textToSend };
+      setMessages(prev => [...prev, userMessage]);
+    }
     setInput("");
+    setLastFailed(null);
     setLoading(true);
 
     try {
@@ -55,7 +61,7 @@ export default function ChatWidget() {
         text: m.text
       }));
 
-      const response = await axios.post("http://127.0.0.1:8000/agent/chat", {
+      const response = await axios.post(`${AGENT_API_URL}/agent/chat`, {
         customer_id: userId,
         message: textToSend,
         history: historyPayload
@@ -68,13 +74,18 @@ export default function ChatWidget() {
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error: any) {
       console.error("Chat error:", error);
-      let errorMsg = "⚠️ Sorry, I'm having trouble connecting to the ClearClaim AI gateway. Please make sure the backend agents are running.";
-      
+      let errorMsg = "⚠️ Sorry, I'm having trouble connecting to the ClearClaim AI gateway. Please make sure the backend agents are running, then tap **Retry** below.";
+
+      // Timed out waiting for the agent (axios timeout)
+      if (error.code === "ECONNABORTED" || String(error.message).toLowerCase().includes("timeout")) {
+        errorMsg = "⚠️ The AI took too long to respond and the request timed out. The agent may be busy — tap **Retry** below to try again.";
+      }
       // Check if it's the Gemini 403 Denied Access error from the backend
-      if (error.response?.data?.detail?.includes("403") || error.response?.data?.detail?.includes("denied access")) {
+      else if (error.response?.data?.detail?.includes("403") || error.response?.data?.detail?.includes("denied access")) {
         errorMsg = "⚠️ Gemini API Error: Your API key has been denied access by Google. Please check your billing or generate a new key in your .env file.";
       }
 
+      setLastFailed(textToSend);
       setMessages(prev => [
         ...prev,
         { sender: "assistant", text: errorMsg }
@@ -164,8 +175,21 @@ export default function ChatWidget() {
                 <div className="flex justify-start">
                   <div className="bg-white/5 border border-white/5 text-slate-400 rounded-2xl rounded-tl-none px-3.5 py-2.5 text-xs flex items-center gap-2">
                     <Loader size={12} className="animate-spin text-indigo-400" />
-                    AI is processing your query...
+                    ClearClaim AI is typing…
                   </div>
+                </div>
+              )}
+
+              {/* Retry affordance after a failed/timed-out request */}
+              {lastFailed && !loading && (
+                <div className="flex justify-start">
+                  <button
+                    onClick={() => sendMessage(lastFailed, true)}
+                    className="text-[11px] font-semibold text-indigo-300 hover:text-indigo-200 bg-indigo-500/10 border border-indigo-500/30 hover:border-indigo-400/50 px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5"
+                  >
+                    <RefreshCw size={11} className="text-indigo-400" />
+                    Retry last message
+                  </button>
                 </div>
               )}
               <div ref={messagesEndRef} />

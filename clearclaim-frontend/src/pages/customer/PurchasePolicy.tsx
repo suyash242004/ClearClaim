@@ -7,6 +7,7 @@ import PolicyHttpService from "../../services/PolicyHttpService";
 import type { Insuranceplan } from "../../models/Insuranceplan";
 import { ShoppingCart, ShieldCheck, Users, CalendarClock, CheckCircle2, AlertTriangle } from "lucide-react";
 import axios from "axios";
+import { AGENT_API_URL } from "../../services/AgentHttpService";
 
 const PurchasePolicy = () => {
   const { userId, walletAddress } = useSelector((state: RootState) => state.auth);
@@ -49,7 +50,7 @@ const PurchasePolicy = () => {
       // Auto-mint soulbound health passport onchain if wallet is connected
       if (walletAddress) {
         try {
-          await axios.post("http://127.0.0.1:8000/agent/health-passport/mint", {
+          await axios.post(`${AGENT_API_URL}/agent/health-passport/mint`, {
             customer_id: userId,
             wallet_address: walletAddress
           }, { timeout: 60000 });
@@ -109,7 +110,7 @@ const PurchasePolicy = () => {
               <option value="">— Choose a Plan —</option>
               {plans.map((p) => (
                 <option key={p.planId} value={p.planId}>
-                  {p.planName} — ₹{p.premiumAmount.toLocaleString()} / yr
+                  {p.planName} — ₹{p.premiumAmount.toLocaleString("en-IN")} / yr
                 </option>
               ))}
             </select>
@@ -210,7 +211,7 @@ const PurchasePolicy = () => {
                   </h3>
 
                   <div className="space-y-3">
-                    <PlanRow icon={ShieldCheck} label="Coverage" value={`₹${plan.coverageAmount.toLocaleString()}`} accent="#34D399" />
+                    <PlanRow icon={ShieldCheck} label="Coverage" value={`₹${plan.coverageAmount.toLocaleString("en-IN")}`} accent="#34D399" />
                     <PlanRow icon={Users} label="Max Members" value={String(plan.maxMembers)} accent="#60A5FA" />
                     <PlanRow icon={CalendarClock} label="Duration" value={`${plan.policyDuration} year(s)`} accent="#FBBF24" />
                   </div>
@@ -220,7 +221,7 @@ const PurchasePolicy = () => {
                       Annual Premium
                     </p>
                     <p className="text-2xl font-bold gradient-text-indigo">
-                      ₹{plan.premiumAmount.toLocaleString()}
+                      ₹{plan.premiumAmount.toLocaleString("en-IN")}
                     </p>
                   </div>
                 </div>

@@ -77,6 +77,7 @@ Risk Scoring Guidelines:
 - Age > 50 with no known disease = risk_score 0.4-0.6 (undetected risk)
 - Age < 40 with no history = risk_score 0.05-0.2
 - Clamp final score between 0.0 and 1.0
+- Set risk_level to "Low" if score < 0.3, "Medium" if 0.3 to 0.59, and "High" if >= 0.6.
 CRITICAL: Keep text fields like `recommended_action` extremely concise (1-2 sentences max).
 
 Return ONLY valid JSON (no markdown fences):

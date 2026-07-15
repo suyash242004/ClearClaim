@@ -140,7 +140,13 @@ async def _scan_customer(policy: dict) -> Optional[RiskScanResult]:
     try:
         ai = generate_json_response(prompt)
         risk_score = float(ai.get("risk_score", local_score))
-        risk_level = ai.get("risk_level", "Medium")
+        if risk_score < 0.3:
+            risk_level = "Low"
+        elif risk_score >= 0.6:
+            risk_level = "High"
+        else:
+            risk_level = "Medium"
+        
         predicted = ai.get("predicted_conditions", [])
         factors = ai.get("risk_factors", pre["local_factors"])
         action = ai.get("recommended_action", "Consult a physician")

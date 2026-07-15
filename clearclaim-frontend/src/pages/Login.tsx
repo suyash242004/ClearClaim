@@ -45,7 +45,7 @@ export default function Login() {
         return;
       }
       dispatch(login({ role: "admin", userId: null }));
-      navigate("/");
+      navigate("/", { replace: true });
       return;
     }
 
@@ -67,7 +67,7 @@ export default function Login() {
           return;
         }
         dispatch(login({ role: "hospital", userId: Number(userId) }));
-        navigate("/");
+        navigate("/", { replace: true });
       } catch {
         setError(`Hospital ID ${userId} not found.`);
       } finally {
@@ -101,7 +101,7 @@ export default function Login() {
         return;
       }
       dispatch(login({ role: "customer", userId: record.customerId }));
-      navigate("/");
+      navigate("/", { replace: true });
     } catch (err: any) {
       let errorMsg = err.message;
       if (err.response?.status === 404) errorMsg = "Email address not found.";

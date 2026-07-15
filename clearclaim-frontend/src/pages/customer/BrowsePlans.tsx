@@ -12,6 +12,7 @@ import GhastButton from "../../components/GhastButton";
 import { Bot, ShieldCheck, Check, Star, Users, Calendar, CheckCircle, Wallet } from "lucide-react";
 import { setWalletAddress } from "../../store/authSlice";
 import axios from "axios";
+import { AGENT_API_URL } from "../../services/AgentHttpService";
 
 interface Plan {
   planId: number;
@@ -37,6 +38,7 @@ export default function BrowsePlans() {
 
   const connectWallet = async () => {
     setConnecting(true);
+    setPurchaseError("");
     try {
       // Check if OKX Wallet is available
       if (typeof window !== "undefined" && (window as any).okxwallet) {
@@ -46,11 +48,11 @@ export default function BrowsePlans() {
           dispatch(setWalletAddress(accounts[0]));
         }
       } else {
-        alert("OKX Wallet not detected! Please install it.");
+        setPurchaseError("OKX Wallet extension not detected — install it from okx.com/web3 to enable crypto payouts. You can still purchase plans with fiat.");
       }
     } catch (error) {
       console.error("Failed to connect wallet:", error);
-      alert("Failed to connect OKX Wallet!");
+      setPurchaseError("Could not connect to OKX Wallet — the request may have been rejected. Please try again.");
     } finally {
       setConnecting(false);
     }
@@ -88,9 +90,10 @@ export default function BrowsePlans() {
 
   const handlePurchase = async (plan: Plan) => {
     if (!userId) {
-      alert("Please login to purchase a policy");
+      setPurchaseError("Please log in to purchase a policy.");
       return;
     }
+    setPurchaseError("");
     setSelectedPlanForPayment(plan);
   };
 
@@ -116,7 +119,7 @@ export default function BrowsePlans() {
       // Auto-mint soulbound health passport onchain if wallet is connected
       if (walletAddress) {
         try {
-          await axios.post("http://127.0.0.1:8000/agent/health-passport/mint", {
+          await axios.post(`${AGENT_API_URL}/agent/health-passport/mint`, {
             customer_id: userId,
             wallet_address: walletAddress
           }, { timeout: 60000 });
@@ -235,8 +238,15 @@ export default function BrowsePlans() {
 
       {/* ── Plan grid ── */}
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <span className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+        // Skeleton cards matching the real grid — no layout shift when plans arrive
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <div
+              key={i}
+              className="h-[380px] rounded-2xl animate-pulse"
+              style={{ background: "#080810", border: "1px solid rgba(255,255,255,0.06)" }}
+            />
+          ))}
         </div>
       ) : plans.length === 0 ? (
         <div className="card p-12 text-center border border-white/5">
@@ -350,7 +360,7 @@ export default function BrowsePlans() {
                     >
                       {purchasing === plan.planId
                         ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        : "Select Plan"
+                        : `Buy for ₹${plan.premiumAmount.toLocaleString("en-IN")}/yr`
                       }
                     </button>
                   </div>

@@ -13,5 +13,8 @@ export interface Claim {
   doctorName?: string;
   description?: string;
   aiDecision?: string;
+  aiReasoning?: string;
+  aiConfidence?: number;
+  fraudScore?: number;
   txHash?: string;
 }

@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../store/store";
 import { readApi } from "../../services/axiosConfig";
-import { AgentHttpService, type CarePlanResponse } from "../../services/AgentHttpService";
+import { AgentHttpService, AGENT_API_URL, type CarePlanResponse } from "../../services/AgentHttpService";
 import ClaimStatusChip from "../../components/ClaimStatusChip";
 import axios from "axios";
 import {
@@ -62,7 +62,7 @@ export default function CustomerDashboard() {
     if (!walletAddress) return;
     setPassportLoading(true);
     try {
-      const res = await axios.get(`http://127.0.0.1:8000/agent/health-passport/${walletAddress}`, { timeout: 20000 });
+      const res = await axios.get(`${AGENT_API_URL}/agent/health-passport/${walletAddress}`, { timeout: 20000 });
       setPassport(res.data);
     } catch (e) {
       console.log("No passport found or contract read failed.");
@@ -76,7 +76,7 @@ export default function CustomerDashboard() {
     if (!walletAddress || !userId) return;
     setMinting(true);
     try {
-      await axios.post("http://127.0.0.1:8000/agent/health-passport/mint", {
+      await axios.post(`${AGENT_API_URL}/agent/health-passport/mint`, {
         customer_id: userId,
         wallet_address: walletAddress
       }, { timeout: 60000 });
@@ -134,6 +134,9 @@ export default function CustomerDashboard() {
         if (!cancelled && careRes.data) setCarePlan(careRes.data);
       })
       .catch((e) => {
+        // 404 = no care plan generated yet (new/low-risk customer) — expected,
+        // not an outage. Only real failures show the "unavailable" card.
+        if (e?.response?.status === 404) return;
         console.error("Health Guardian error:", e);
         if (!cancelled) setHealthGuardianError(true);
       });
@@ -183,6 +186,39 @@ export default function CustomerDashboard() {
           </span>
         </div>
       </motion.div>
+
+      {/* ── First-run guidance: brand-new customer with no coverage ── */}
+      {policies.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="card p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+          style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.25)" }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)" }}
+            >
+              <ShieldCheck size={18} color="#818CF8" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-100">You're not covered yet</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Pick a health plan to unlock claims, AI care plans and your on-chain health passport.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/browse-plans"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-full transition-colors shrink-0"
+            style={{ background: "#6366F1", color: "#fff" }}
+          >
+            Browse plans to get started <ArrowRight size={12} />
+          </Link>
+        </motion.div>
+      )}
 
       {/* ── Quick actions ── */}
       <div>

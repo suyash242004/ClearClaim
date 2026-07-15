@@ -22,6 +22,7 @@ CONTRACT_ADDRESS         = os.getenv("CONTRACT_ADDRESS",        "0xB0Df35C3097B6
 RISK_ORACLE_ADDRESS      = os.getenv("RISK_ORACLE_ADDRESS",     "0xD1CAF7812321B0cf3F8568079F213042D8e284f6")
 HEALTH_GUARDIAN_ADDRESS  = os.getenv("HEALTH_GUARDIAN_ADDRESS", "0x07Fc775Aa387e0E8b71dB1053fF3977ec0a8302f")
 HEALTH_PASSPORT_ADDRESS  = os.getenv("HEALTH_PASSPORT_ADDRESS", "")
+PREMIUM_VAULT_ADDRESS    = os.getenv("PREMIUM_VAULT_ADDRESS", "")
 
 # gemini-3.5-flash: best JSON reliability + speed for adjudication (paid tier).
 # Override with MODEL_NAME in .env; falls back to 2.5-flash if unavailable.

@@ -1,7 +1,7 @@
 // SubmitClaim.tsx — Multi-step form wizard with AI risk preview
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../store/store";
 import { readApi, writeApi } from "../../services/axiosConfig";
@@ -32,6 +32,8 @@ export default function SubmitClaim() {
   // Selected policy's coverage for amount validation
   const [selectedPolicyCoverage, setSelectedPolicyCoverage] = useState<number>(0);
   const [selectedPolicyUsed, setSelectedPolicyUsed] = useState<number>(0);
+  // Approved claim totals per policy — lets us show real remaining coverage client-side
+  const [usedByPolicy, setUsedByPolicy] = useState<Record<number, number>>({});
   const [step2Error, setStep2Error] = useState("");
 
   const [aiPreview, setAiPreview] = useState<{ score: number; risk: string } | null>(null);
@@ -40,17 +42,33 @@ export default function SubmitClaim() {
   const [submitError, setSubmitError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  // Load only this customer's ACTIVE policies on mount
+  const [policiesLoading, setPoliciesLoading] = useState(true);
+
+  // Load only this customer's ACTIVE policies on mount,
+  // plus their claims so we can show real remaining coverage per policy.
   useEffect(() => {
     const load = async () => {
       if (!userId) return;
-      try {
-        const res = await readApi.get(`/api/customer/${userId}/policies`);
-        const activePolicies = (res.data?.records ?? []).filter((p: any) => p.isActive === true);
+      setPoliciesLoading(true);
+      const [polRes, claimsRes] = await Promise.allSettled([
+        readApi.get(`/api/customer/${userId}/policies`),
+        readApi.get(`/api/customer/${userId}/claims`),
+      ]);
+      if (polRes.status === "fulfilled") {
+        const activePolicies = (polRes.value.data?.records ?? []).filter((p: any) => p.isActive === true);
         setPolicies(activePolicies);
-      } catch (e) {
-        console.error("Failed to load customer policies", e);
       }
+      if (claimsRes.status === "fulfilled") {
+        // Sum APPROVED claim amounts per policy — that's coverage already consumed
+        const used: Record<number, number> = {};
+        (claimsRes.value.data?.records ?? []).forEach((c: any) => {
+          if (String(c.status).toLowerCase() === "approved") {
+            used[c.policyId] = (used[c.policyId] ?? 0) + Number(c.claimAmount || 0);
+          }
+        });
+        setUsedByPolicy(used);
+      }
+      setPoliciesLoading(false);
     };
     load();
   }, [userId]);
@@ -83,8 +101,8 @@ export default function SubmitClaim() {
       const amt = Number(form.claimAmount);
       if (!form.claimAmount || amt <= 0) { setStep2Error("Claim amount must be greater than ₹0."); return; }
       if (amt < 100) { setStep2Error("Claim amount must be at least ₹100."); return; }
-      const remaining = selectedPolicyCoverage - selectedPolicyUsed;
-      if (remaining > 0 && amt > remaining) {
+      const remaining = Math.max(0, selectedPolicyCoverage - selectedPolicyUsed);
+      if (selectedPolicyCoverage > 0 && amt > remaining) {
         setStep2Error(`Claim amount ₹${amt.toLocaleString('en-IN')} exceeds your remaining coverage of ₹${remaining.toLocaleString('en-IN')}.`);
         return;
       }
@@ -113,6 +131,21 @@ export default function SubmitClaim() {
     }
   };
 
+  // The backend has no payout-destination field, so we persist the choice
+  // as a structured suffix on the claim description (visible to admins).
+  const buildDescription = () => {
+    const base = form.description.trim();
+    if (!walletAddress) return base || undefined;
+    const suffix =
+      payoutDestination === "crypto"
+        ? `[Payout: OKX Wallet ${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}]`
+        : "[Payout: Bank Transfer (INR)]";
+    // Keep total within the 500-char description limit
+    const room = 500 - suffix.length - 1;
+    const trimmedBase = base.length > room ? base.slice(0, room) : base;
+    return trimmedBase ? `${trimmedBase} ${suffix}` : suffix;
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmitError("");
@@ -125,7 +158,7 @@ export default function SubmitClaim() {
           claimAmount: Number(form.claimAmount),
           disease: form.disease.trim(),
           doctorName: form.doctorName.trim(),
-          description: form.description.trim() || undefined,
+          description: buildDescription(),
         },
       });
       setSuccess(true);
@@ -186,9 +219,24 @@ export default function SubmitClaim() {
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1">
               <label className="block text-sm font-medium mb-3 text-slate-300">Which policy are you claiming under?</label>
-              {policies.length === 0 ? (
-                <div className="p-6 text-center rounded-xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                  <p className="text-sm" style={{ color: "#64748B" }}>No active policies found. Please purchase a plan first.</p>
+              {policiesLoading ? (
+                <div className="space-y-3">
+                  {[1, 2].map(i => (
+                    <div key={i} className="h-[72px] rounded-xl animate-pulse" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }} />
+                  ))}
+                </div>
+              ) : policies.length === 0 ? (
+                <div className="p-8 text-center rounded-xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <Shield size={28} className="mx-auto mb-3 text-slate-600" />
+                  <p className="text-sm font-medium text-slate-300 mb-1">You need an active policy to submit a claim</p>
+                  <p className="text-xs mb-4" style={{ color: "#64748B" }}>Once you purchase a plan, you can file claims against it here.</p>
+                  <Link
+                    to="/browse-plans"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-full transition-colors"
+                    style={{ background: "#6366F1", color: "#fff" }}
+                  >
+                    Browse plans to get started <ArrowRight size={12} />
+                  </Link>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -198,8 +246,8 @@ export default function SubmitClaim() {
                       onClick={() => {
                         setForm({ ...form, policyId: String(p.policyId), planId: String(p.planId), hospitalId: "" });
                         setSelectedPolicyCoverage(p.coverageAmount ?? 0);
-                        // Estimate used from approved claims — will be validated by backend trigger anyway
-                        setSelectedPolicyUsed(0);
+                        // Used = sum of this policy's approved claims (backend trigger re-validates on submit)
+                        setSelectedPolicyUsed(usedByPolicy[p.policyId] ?? 0);
                       }}
                       className={`p-4 rounded-xl cursor-pointer border transition-all ${form.policyId === String(p.policyId) ? "border-indigo-500 bg-indigo-500/10" : "border-white/10 bg-white/5 hover:border-white/20"}`}
                     >
@@ -214,8 +262,9 @@ export default function SubmitClaim() {
                         )}
                       </div>
                       {form.policyId === String(p.policyId) && p.coverageAmount && (
-                        <div className="mt-2 pt-2 border-t border-white/5">
+                        <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-4">
                           <p className="text-xs text-slate-400">Coverage: <span className="text-white font-medium">₹{Number(p.coverageAmount).toLocaleString('en-IN')}</span></p>
+                          <p className="text-xs text-slate-400">Remaining: <span className="text-emerald-400 font-medium">₹{Math.max(0, Number(p.coverageAmount) - (usedByPolicy[p.policyId] ?? 0)).toLocaleString('en-IN')}</span></p>
                         </div>
                       )}
                     </div>
@@ -276,7 +325,15 @@ export default function SubmitClaim() {
                 <label className="block text-sm font-medium mb-1.5 text-slate-300">
                   Claim Amount (₹) <span className="text-red-400">*</span>
                   {selectedPolicyCoverage > 0 && (
-                    <span className="text-xs text-slate-500 ml-2">Max coverage: ₹{selectedPolicyCoverage.toLocaleString('en-IN')}</span>
+                    <span className="text-xs text-slate-500 ml-2">
+                      Remaining coverage:{" "}
+                      <span className="text-emerald-400 font-medium">
+                        ₹{Math.max(0, selectedPolicyCoverage - selectedPolicyUsed).toLocaleString('en-IN')}
+                      </span>
+                      {selectedPolicyUsed > 0 && (
+                        <> of ₹{selectedPolicyCoverage.toLocaleString('en-IN')}</>
+                      )}
+                    </span>
                   )}
                 </label>
                 <input
@@ -378,6 +435,16 @@ export default function SubmitClaim() {
                 <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-slate-400">Disease</span><span className="text-white">{form.disease}</span></div>
                 <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-slate-400">Doctor</span><span className="text-white">{form.doctorName}</span></div>
                 <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-slate-400">Amount</span><span className="text-white font-bold">₹{Number(form.claimAmount).toLocaleString('en-IN')}</span></div>
+                {walletAddress && (
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span className="text-slate-400">Payout to</span>
+                    <span className={payoutDestination === "crypto" ? "text-emerald-400 font-medium" : "text-white"}>
+                      {payoutDestination === "crypto"
+                        ? `OKX Wallet ${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`
+                        : "Bank Transfer (INR)"}
+                    </span>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}

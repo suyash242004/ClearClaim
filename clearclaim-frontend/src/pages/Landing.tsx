@@ -13,8 +13,8 @@ import LandingNav from "../components/LandingNav";
 const features = [
   {
     num: "01",
-    title: "AI Claim Processor",
-    desc: "Gemini 2.5 Flash reads your policy, validates disease, detects fraud patterns. Autonomous decisions in seconds.",
+    title: "LangGraph Claim Pipeline",
+    desc: "IRDAI rules gate → fraud score → Gemini 3.5 Flash adjudication → onchain record. Checkpointed to disk — a crash resumes at the exact step it stopped.",
     icon: Brain,
   },
   {
@@ -25,31 +25,45 @@ const features = [
   },
   {
     num: "03",
-    title: "Zero Human Delays",
-    desc: "Claims approved in seconds, not days. Blockchain tx hash as proof. No back-and-forth paperwork.",
+    title: "Human-in-the-Loop, Only When It Matters",
+    desc: "Low-confidence, high-fraud, or high-value claims pause for an admin. Everything else settles in seconds — with a tx hash as proof.",
     icon: Zap,
   },
   {
     num: "04",
-    title: "Finance Copilot",
-    desc: "AI recommends the right plan. Fraud scored before submission. Your personal insurance advisor.",
+    title: "Proactive Health Guardian",
+    desc: "Nightly risk scans predict claims months ahead. High-risk patients wake up to a personalized care plan — generated while they slept.",
+    icon: Activity,
+  },
+  {
+    num: "05",
+    title: "Agents That Earn",
+    desc: "Every capability is a priced tool on the OKX.AI marketplace. A live ledger tracks revenue vs compute — each call runs at ~99% margin.",
     icon: Shield,
   },
+];
+
+// Compact roster shown under the "Eleven agents" heading
+const agentRoster = [
+  "Claim Processor", "Fraud Detector", "Policy Advisor",
+  "LangGraph Orchestrator", "Predictive Risk", "Health Guardian",
+  "Hospital Assistant", "Health Passport", "Chat Concierge",
+  "RLHF Self-Learning", "Legacy Pipeline",
 ];
 
 const stats = [
   { value: "₹2.4Cr", label: "Claims Processed" },
   { value: "94%", label: "AI Accuracy" },
-  { value: "3", label: "Autonomous Agents" },
-  { value: "0", label: "Manual Reviews" },
+  { value: "11", label: "Autonomous Agents" },
+  { value: "5", label: "Live Smart Contracts" },
 ];
 
 // Fake terminal lines for the product mockup
 const terminalLines = [
-  { type: "info", text: "▸ ClearClaim AI Agent v1.0 initialized" },
-  { type: "info", text: "▸ Connected to X Layer Testnet (chainId: 195)" },
-  { type: "process", text: "⟳ Processing Claim #1042 — Disease: Cardiac Surgery" },
-  { type: "process", text: "⟳ Fraud Score: 0.12 (LOW RISK)" },
+  { type: "info", text: "▸ ClearClaim AI Agent v3.0 initialized — 11 agents online" },
+  { type: "info", text: "▸ Connected to X Layer Testnet (chainId: 1952)" },
+  { type: "process", text: "⟳ Claim #1042 — IRDAI rules gate passed · payable ₹1,80,000" },
+  { type: "process", text: "⟳ Fraud Score: 12/100 (LOW RISK)" },
   { type: "success", text: "✓ AI Decision: APPROVED — Confidence: 94.7%" },
   { type: "success", text: "✓ Tx Hash: 0x8a3f...e7b2 written to X Layer" },
   { type: "info", text: "▸ Waiting for next claim..." },
@@ -114,8 +128,9 @@ export default function Landing() {
                 className="text-base leading-relaxed max-w-md mb-10"
                 style={{ color: "#888899" }}
               >
-                AI agents process, verify, and settle medical insurance claims
-                onchain. No human admin. No delays. Every decision — immutable.
+                Eleven AI agents process, verify, and settle medical insurance
+                claims onchain. Autonomous by default — a human steps in only
+                when the AI isn't sure. Every decision, immutable.
               </p>
 
               {/* CTAs */}
@@ -143,7 +158,7 @@ export default function Landing() {
                   <div className="terminal-chrome-dot" style={{ background: "#FEBC2E" }} />
                   <div className="terminal-chrome-dot" style={{ background: "#28C840" }} />
                   <span className="ml-3 text-xs" style={{ color: "#555" }}>
-                    AI Agent — ClearClaim v1.0
+                    AI Agent — ClearClaim v3.0
                   </span>
                 </div>
                 {/* Terminal lines */}
@@ -198,7 +213,7 @@ export default function Landing() {
                 className="font-bold leading-tight"
                 style={{ fontSize: "clamp(36px, 4vw, 56px)", color: "#fff", letterSpacing: "-0.02em" }}
               >
-                Four agents.
+                Eleven agents.
                 <br />
                 <span className="font-serif-italic" style={{ fontWeight: 400, color: "#888899" }}>
                   Zero friction.
@@ -208,6 +223,27 @@ export default function Landing() {
                 From claim submission to onchain settlement — every step is
                 autonomous, transparent, and cryptographically verified.
               </p>
+
+              {/* The full roster — proves the headline at a glance */}
+              <div className="mt-10 grid grid-cols-2 gap-x-8 gap-y-3 max-w-sm">
+                {agentRoster.map((name, i) => (
+                  <motion.div
+                    key={name}
+                    initial={{ opacity: 0, x: -8 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.35, delay: 0.3 + i * 0.05 }}
+                    className="flex items-baseline gap-2.5"
+                  >
+                    <span className="text-[10px] font-mono font-bold shrink-0" style={{ color: "#6366F1" }}>
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span className="text-xs" style={{ color: "#888899" }}>
+                      {name}
+                    </span>
+                  </motion.div>
+                ))}
+              </div>
             </motion.div>
 
             {/* Right — Numbered feature list */}
@@ -331,8 +367,8 @@ export default function Landing() {
             {[
               {
                 icon: Bot,
-                title: "3 AI Agents",
-                desc: "Claim Processor, Fraud Detector, and Policy Advisor — each powered by Gemini 2.5 Flash with specialized prompts.",
+                title: "11 AI Agents on LangGraph",
+                desc: "Claim adjudication, fraud scoring, clinical review, predictive risk, RLHF self-learning — orchestrated in a crash-resumable, fully auditable workflow.",
                 accent: "#6366F1",
               },
               {
@@ -343,8 +379,8 @@ export default function Landing() {
               },
               {
                 icon: FileSearch,
-                title: "X Layer Smart Contracts",
-                desc: "InsuranceClaim.sol deployed on X Layer testnet. Every AI decision gets a permanent, verifiable onchain record.",
+                title: "5 Live X Layer Contracts",
+                desc: "Claims, risk oracle, health guardian, premium vault, and a soulbound health passport — deployed on X Layer testnet, covered by a 70-test Hardhat suite.",
                 accent: "#F59E0B",
               },
             ].map((card, i) => {
@@ -414,7 +450,7 @@ export default function Landing() {
               AI agents and verified on blockchain.
             </p>
             <button
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/login")}
               className="btn-ghast text-sm px-8 py-3.5"
             >
               Launch App <ArrowRight size={14} />
@@ -437,16 +473,21 @@ export default function Landing() {
             Built for OKX.AI Genesis Hackathon 2026 · Powered by Gemini & X Layer
           </p>
           <div className="flex items-center gap-6">
-            {["GitHub", "X Layer"].map((link) => (
+            {[
+              { label: "GitHub", href: "https://github.com/suyash242004/ClearClaim" },
+              { label: "Verify Onchain", href: "https://www.oklink.com/xlayer-test/address/0xed7c36ce8EB540e35604a9eeFa72f3b19106A709" },
+            ].map((link) => (
               <a
-                key={link}
-                href="#"
+                key={link.label}
+                href={link.href}
+                target="_blank"
+                rel="noreferrer"
                 className="text-xs transition-colors"
                 style={{ color: "#555" }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = "#fff")}
                 onMouseLeave={(e) => (e.currentTarget.style.color = "#555")}
               >
-                {link}
+                {link.label}
               </a>
             ))}
           </div>

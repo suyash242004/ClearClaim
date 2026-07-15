@@ -3,8 +3,10 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../store/store";
 import ClaimHttpService from "../../services/ClaimHttpService";
 import type { Claim } from "../../models/Claim";
-import { ClipboardList, Activity } from "lucide-react";
+import { ClipboardList, Activity, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import ClaimStatusChip from "../../components/ClaimStatusChip";
+import FraudScoreBadge from "../../components/FraudScoreBadge";
 import TxHashLink from "../../components/TxHashLink";
 import { motion } from "framer-motion";
 
@@ -63,8 +65,25 @@ const MyClaims = () => {
           className="card p-12 text-center border border-white/5 bg-white/[0.01]"
         >
           <ClipboardList className="mx-auto text-slate-600 mb-3" size={40} />
-          <p className="text-sm text-slate-400">No claims found.</p>
-          <p className="text-xs text-slate-500 mt-1">Submit a new claim to see it here.</p>
+          <p className="text-sm text-slate-400">No claims yet.</p>
+          <p className="text-xs text-slate-500 mt-1 mb-4">
+            When you file a claim it will appear here with its AI decision, fraud score and blockchain proof.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <Link
+              to="/submit-claim"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-full transition-colors"
+              style={{ background: "#6366F1", color: "#fff" }}
+            >
+              Submit a claim <ArrowRight size={12} />
+            </Link>
+            <Link
+              to="/browse-plans"
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              No policy yet? Browse plans →
+            </Link>
+          </div>
         </motion.div>
       ) : (
         <motion.div 
@@ -81,6 +100,7 @@ const MyClaims = () => {
                   <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Disease</th>
                   <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Amount (₹)</th>
                   <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+                  <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Fraud Score</th>
                   <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">AI Decision</th>
                   <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
                   <th className="text-left px-5 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Tx Hash</th>
@@ -108,8 +128,18 @@ const MyClaims = () => {
                     </td>
                     <td className="px-5 py-4 text-slate-400 text-xs">{new Date(claim.claimDate).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</td>
                     <td className="px-5 py-4">
+                      <FraudScoreBadge score={claim.fraudScore} />
+                    </td>
+                    <td className="px-5 py-4">
                       {claim.aiDecision ? (
-                        <ClaimStatusChip status={claim.aiDecision as string} />
+                        <div className="flex flex-col gap-1">
+                          <ClaimStatusChip status={claim.aiDecision as string} />
+                          {claim.aiConfidence != null && (
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {Math.round(Number(claim.aiConfidence) * 100)}% confident
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-slate-600 font-mono text-xs">AWAITING</span>
                       )}

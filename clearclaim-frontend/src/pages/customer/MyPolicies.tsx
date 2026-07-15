@@ -4,7 +4,8 @@ import type { RootState } from "../../store/store";
 import PolicyHttpService from "../../services/PolicyHttpService";
 import type { Policy } from "../../models/Policy";
 import { motion } from "framer-motion";
-import { FileText, Shield, Calendar, Award, RotateCcw } from "lucide-react";
+import { Link } from "react-router-dom";
+import { FileText, Shield, Calendar, Award, RotateCcw, ArrowRight } from "lucide-react";
 
 export default function MyPolicies() {
   const { userId } = useSelector((state: RootState) => state.auth);
@@ -63,8 +64,17 @@ export default function MyPolicies() {
       {policies.length === 0 ? (
         <div className="card p-12 text-center border border-white/5 bg-white/[0.01]">
           <FileText className="mx-auto text-slate-600 mb-3" size={40} />
-          <p className="text-sm text-slate-400">No active insurance policies found.</p>
-          <p className="text-xs text-slate-500 mt-1">Purchase a policy from the Browse Plans section to get started.</p>
+          <p className="text-sm font-medium text-slate-300">You don't have any coverage yet</p>
+          <p className="text-xs text-slate-500 mt-1 mb-4">
+            Pick a plan that fits your family and it will show up here as an active policy.
+          </p>
+          <Link
+            to="/browse-plans"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-full transition-colors"
+            style={{ background: "#6366F1", color: "#fff" }}
+          >
+            Browse plans to get started <ArrowRight size={12} />
+          </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
