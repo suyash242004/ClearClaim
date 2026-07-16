@@ -41,6 +41,7 @@ export default function AdminDashboard() {
   const [agentResults, setAgentResults] = useState<Record<number, ClaimDecision>>({});
   const [lastRun, setLastRun] = useState<string | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState(false);
   const [scanResults, setScanResults] = useState<RiskScanResult[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [orchestratingClaim, setOrchestratingClaim] = useState<number | null>(null);
@@ -62,6 +63,7 @@ export default function AdminDashboard() {
 
   const loadData = async () => {
     setStatsLoading(true);
+    setStatsError(false);
     try {
       const [dashRes, pendRes] = await Promise.all([
         readApi.get("/api/admin/dashboard"),
@@ -98,7 +100,9 @@ export default function AdminDashboard() {
       }
       setPendingClaims(pendClaims);
     } catch (e) {
+      // Zeros without context are misleading — surface that the data API is down
       console.error("Dashboard load error", e);
+      setStatsError(true);
     } finally {
       setStatsLoading(false);
     }
@@ -164,7 +168,7 @@ export default function AdminDashboard() {
 
     setIsAgentRunning(true);
     setLogs([]);
-    addLog("Initializing ClearClaim AI Agent v1.0…", "info");
+    addLog("Initializing ClearClaim AI Agent v3.0…", "info");
     addLog(`Connecting to Gemini 3.5 Flash via SSE stream…`, "info");
 
     const cleanup = AgentHttpService.streamProcessClaims(
@@ -239,6 +243,16 @@ export default function AdminDashboard() {
       transition={{ duration: 0.35 }}
       className="space-y-6"
     >
+      {/* ── Data-API error banner — stats showing 0 without this is misleading ── */}
+      {statsError && (
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-4 py-3 rounded-lg mb-6 flex items-center justify-between">
+          <span>Could not load claim data — is the ReadAPI running on port 5234?</span>
+          <button onClick={loadData} className="text-xs font-semibold underline hover:text-red-300">
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* ── Page header ── */}
       <div className="flex items-start justify-between gap-4 mb-8">
         <div>
@@ -326,7 +340,7 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          <TerminalWindow title="AI Agent — ClearClaim v1.0">
+          <TerminalWindow title="AI Agent — ClearClaim v3.0">
             <AgentStatusPanel logs={logs} isRunning={isAgentRunning} />
           </TerminalWindow>
 

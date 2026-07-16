@@ -20,13 +20,50 @@ import logging
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, Response, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Any, Dict, Optional
 
 router = APIRouter()
 logger = logging.getLogger("clearclaim.mcp")
+
+# ── x402 payment challenge (OKX.AI compliance) ───────────────────────────────
+# OKX's reviewer probes /mcp/invoke expecting HTTP 402 + an `accepts` array
+# (not 405). Services are listed free (0 USDT), so any payment proof — or a
+# signed 0-amount transfer — is accepted and the result returned.
+X402_USDT_XLAYER = "0x779Ded0c9e1022225f8E0630b35a9b54bE713736"   # USDT on X Layer (eip155:196)
+ASP_PAYTO = os.getenv("ASP_PAYTO_ADDRESS", "0x9b0ecb6731bc961614fbfb99b835ba8b429f0cd9")
+
+
+def _x402_challenge(resource_url: str, price: str = "0") -> JSONResponse:
+    """HTTP 402 challenge with the accepts array the x402 client signs against."""
+    return JSONResponse(
+        status_code=402,
+        content={
+            "x402Version": 1,
+            "error": "X-PAYMENT header is required",
+            "accepts": [{
+                "scheme": "exact",
+                "network": "eip155:196",
+                "maxAmountRequired": price,      # all ClearClaim services are free (0)
+                "resource": resource_url,
+                "description": "ClearClaim AI — autonomous medical insurance agent services (free per-call)",
+                "mimeType": "application/json",
+                "payTo": ASP_PAYTO,
+                "maxTimeoutSeconds": 300,
+                "asset": X402_USDT_XLAYER,
+                "extra": {"name": "USDT", "version": "2"},
+            }],
+        },
+    )
+
+
+def _is_internal_call(request: Request) -> bool:
+    """In-process agent-to-agent calls come from loopback; external traffic
+    (Render proxy included) does not — those must complete the x402 handshake."""
+    host = request.client.host if request.client else ""
+    return host in ("127.0.0.1", "::1", "localhost")
 
 # ── ASP Identity card ─────────────────────────────────────────────────────────
 # Fill AGENT_WALLET_ADDRESS in agents/.env after OKX.AI ASP registration
@@ -314,24 +351,41 @@ async def list_tools():
     return {"tools": TOOLS, "agent": AGENT_NAME, "version": AGENT_VERSION}
 
 
+@router.get("/mcp/invoke")
+async def invoke_probe(request: Request):
+    """x402 discovery probe — unpaid GET receives the 402 payment challenge
+    (previously returned 405, which broke OKX's payment handshake)."""
+    return _x402_challenge(str(request.url).split("?")[0])
+
+
 class InvokeRequest(BaseModel):
     tool: str
     params: Optional[Dict[str, Any]] = {}
 
 
 @router.post("/mcp/invoke")
-async def invoke_tool(req: InvokeRequest, request: Request):
+async def invoke_tool(req: InvokeRequest, request: Request, response: Response):
     """
     Routes an OKX.AI tool invocation to the appropriate agent function.
     Checks X-Payment header (demo: log only; full verification post-listing).
     """
-    # ── Payment verification (x402 protocol skeleton) ─────────────────────
-    payment_header = request.headers.get("X-Payment")
+    # ── Payment verification (x402) ───────────────────────────────────────
+    # External unpaid POSTs get the 402 challenge; a request carrying an
+    # X-PAYMENT proof (services are free — 0 amount) is served. In-process
+    # agent-to-agent calls on loopback skip the handshake.
+    payment_header = request.headers.get("X-Payment") or request.headers.get("X-PAYMENT")
     if payment_header:
         logger.info(f"[MCP] X-Payment received for tool '{req.tool}': {payment_header[:40]}…")
+        # x402 settlement confirmation (free service — nothing to settle onchain)
+        import base64 as _b64
+        response.headers["X-PAYMENT-RESPONSE"] = _b64.b64encode(json.dumps(
+            {"success": True, "network": "eip155:196", "transaction": ""}
+        ).encode()).decode()
+    elif not _is_internal_call(request):
+        logger.info(f"[MCP] Unpaid external call for tool '{req.tool}' — issuing 402 challenge.")
+        return _x402_challenge(str(request.url).split("?")[0])
     else:
-        # In production, reject if no payment. For hackathon demo, allow through.
-        logger.warning(f"[MCP] No X-Payment header for tool '{req.tool}'. Demo mode — proceeding.")
+        logger.info(f"[MCP] Internal loopback call for tool '{req.tool}' — no payment required.")
 
     # ── Route to internal agent ───────────────────────────────────────────
     import time as _time

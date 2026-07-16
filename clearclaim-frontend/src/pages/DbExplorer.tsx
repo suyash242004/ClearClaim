@@ -523,11 +523,15 @@ const DbExplorer = () => {
                             <Pencil size={13} /> Edit
                           </button>
                         </td>
-                        {/* Delete */}
+                        {/* Delete — intentionally disabled on the public demo so
+                            visitors can't wipe seed data. Backend delete still works;
+                            re-enable by removing `disabled` and restoring onClick. */}
                         <td className="px-4 py-3">
                           <button
-                            onClick={() => handleDelete(rec)}
-                            className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-red-400" style={{ color: "#F87171" }}
+                            disabled
+                            title="Deletion is disabled in the public demo"
+                            className="flex items-center gap-1 text-xs font-medium opacity-40 cursor-not-allowed"
+                            style={{ color: "#F87171" }}
                           >
                             <Trash2 size={13} /> Delete
                           </button>
