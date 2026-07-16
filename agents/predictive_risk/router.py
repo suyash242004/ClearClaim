@@ -12,6 +12,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import anyio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
@@ -138,7 +139,7 @@ async def _scan_customer(policy: dict) -> Optional[RiskScanResult]:
     )
 
     try:
-        ai = generate_json_response(prompt)
+        ai = await anyio.to_thread.run_sync(generate_json_response, prompt)
         risk_score = float(ai.get("risk_score", local_score))
         if risk_score < 0.3:
             risk_level = "Low"
@@ -166,13 +167,13 @@ async def _scan_customer(policy: dict) -> Optional[RiskScanResult]:
     risk_tx = None
     try:
         from shared.blockchain import record_risk_score
-        risk_tx = record_risk_score(
+        risk_tx = await anyio.to_thread.run_sync(lambda: record_risk_score(
             customer_id=customer_id,
             risk_score=risk_score,
             risk_level=risk_level,
             predicted_conditions=predicted,
             guardian_triggered=False,  # updated below
-        )
+        ))
     except Exception as e:
         print(f"[PredictiveRisk] Blockchain write skipped: {e}")
 

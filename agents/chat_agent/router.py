@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
 import re
+import anyio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
@@ -189,7 +190,7 @@ User: {request.message}
 Decide on your next step. Output ONLY the JSON block:"""
 
         try:
-            response = gemini_client.model.generate_content(prompt)
+            response = await anyio.to_thread.run_sync(gemini_client.model.generate_content, prompt)
             text = response.text.strip()
             
             # Clean markdown code blocks if any
@@ -232,7 +233,7 @@ Decide on your next step. Output ONLY the JSON block:"""
             # Try once more requesting normal markdown text
             try:
                 fallback_prompt = f"Format your response as a friendly conversation response directly. User: {request.message}"
-                res = gemini_client.model.generate_content(fallback_prompt)
+                res = await anyio.to_thread.run_sync(gemini_client.model.generate_content, fallback_prompt)
                 return {"response": res.text}
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")

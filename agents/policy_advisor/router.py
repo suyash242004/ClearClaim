@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import anyio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 
@@ -100,7 +101,7 @@ async def recommend_policy(request: PolicyRecommendationRequest):
     # RAG Semantic Search — best-effort: a failed embedding must never 500 the endpoint
     rag_query = f"Medical History: {request.medical_history}. Age: {request.age}"
     try:
-        retrieved_clauses = semantic_search(rag_query, top_k=2)
+        retrieved_clauses = await anyio.to_thread.run_sync(lambda: semantic_search(rag_query, top_k=2))
         rag_context = "\n".join([f"- {clause}" for clause in retrieved_clauses])
     except Exception as e:
         rag_context = "(policy clause retrieval unavailable — rely on the rules above)"
@@ -142,7 +143,7 @@ Return ONLY valid JSON (no markdown fences, no extra text):
   "confidence_score": 0.92
 }}"""
 
-    result = generate_json_response(prompt)
+    result = await anyio.to_thread.run_sync(generate_json_response, prompt)
 
     return PolicyRecommendationResponse(
         recommended_plan_id=int(result.get("recommended_plan_id", 0)),

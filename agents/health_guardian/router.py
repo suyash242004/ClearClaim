@@ -13,6 +13,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import anyio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Any
@@ -87,7 +88,7 @@ async def generate_care_plan(customer_id: int, req: CarePlanRequest):
     )
 
     try:
-        ai = generate_json_response(prompt)
+        ai = await anyio.to_thread.run_sync(generate_json_response, prompt)
     except Exception as e:
         # Fallback plan if Gemini fails
         ai = {
@@ -143,12 +144,12 @@ async def generate_care_plan(customer_id: int, req: CarePlanRequest):
     # "AI acted BEFORE any claim was filed" — immutable on X Layer
     try:
         from shared.blockchain import record_intervention
-        record_intervention(
+        await anyio.to_thread.run_sync(lambda: record_intervention(
             customer_id=customer_id,
             risk_score=req.risk_score,
             care_plan=care_plan,
             risk_factors=req.risk_factors,
-        )
+        ))
     except Exception as e:
         # Non-fatal — care plan is already saved to DB
         print(f"[HealthGuardian] Blockchain write skipped for customer {customer_id}: {e}")

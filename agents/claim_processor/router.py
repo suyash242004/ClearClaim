@@ -18,6 +18,7 @@ from typing import List, AsyncGenerator
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import httpx
+import anyio
 from shared.config import READ_API, WRITE_API, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 from shared.db import get_customer_history, get_policy_details, get_previous_claims_total, check_hospital_validity
 from shared.gemini_client import generate_json_response
@@ -154,7 +155,7 @@ async def _process_single_claim(claim: dict, client: httpx.AsyncClient) -> Claim
     # RAG Semantic Search — best-effort: a failed embedding must never break adjudication
     rag_query = f"Disease: {disease}. Description: {description}"
     try:
-        retrieved_clauses = semantic_search(rag_query, top_k=2)
+        retrieved_clauses = await anyio.to_thread.run_sync(lambda: semantic_search(rag_query, top_k=2))
         rag_context = "\n".join([f"- {clause}" for clause in retrieved_clauses])
     except Exception:
         rag_context = "(policy clause retrieval unavailable — rely on the rules above)"
@@ -177,7 +178,7 @@ async def _process_single_claim(claim: dict, client: httpx.AsyncClient) -> Claim
         rag_context=rag_context
     )
 
-    ai = generate_json_response(prompt)
+    ai = await anyio.to_thread.run_sync(generate_json_response, prompt)
     decision   = ai.get("decision", "Flag")
     reasoning  = ai.get("reasoning", "No reasoning returned.")
     confidence = float(ai.get("confidence_score", 0.0))
@@ -203,7 +204,7 @@ async def _process_single_claim(claim: dict, client: httpx.AsyncClient) -> Claim
     tx_hash = None
     try:
         from shared.blockchain import record_claim_decision
-        tx_hash = record_claim_decision(claim_id, decision, reasoning, int(confidence * 100))
+        tx_hash = await anyio.to_thread.run_sync(lambda: record_claim_decision(claim_id, decision, reasoning, int(confidence * 100)))
     except Exception as e:
         print(f"[ClaimProcessor] Blockchain write skipped for claim {claim_id}: {e}")
 
