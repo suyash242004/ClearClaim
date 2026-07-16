@@ -328,7 +328,7 @@ TOOLS = [
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.get("/.well-known/agent.json")
-async def agent_identity():
+async def agent_identity(request: Request):
     """OKX.AI ASP identity card — describes the service provider."""
     return {
         "name":           AGENT_NAME,
@@ -339,8 +339,8 @@ async def agent_identity():
         "payment_currency": "USDT",
         "blockchain":     "X Layer (chainId: 1952)",
         "tools":          [t["name"] for t in TOOLS],
-        "pricing_url":    "http://localhost:8000/mcp/tools",
-        "contact":        "clearclaim@okx.ai",
+        "pricing_url":    str(request.base_url).rstrip("/") + "/mcp/tools",
+        "contact":        "suyashmatade007@gmail.com",
         "tags":           ["insurance", "healthcare", "AI", "fraud-detection", "onchain"],
     }
 
