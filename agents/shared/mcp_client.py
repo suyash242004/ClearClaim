@@ -1,6 +1,10 @@
+import os
 import httpx
 
-MCP_SERVER_URL = "http://localhost:8000"
+# 127.0.0.1 (not "localhost") so the gateway sees a loopback client and skips
+# the x402 payment gate for internal agent-to-agent calls; the port must match
+# whatever this process actually serves on (Render binds $PORT, not 8000).
+MCP_SERVER_URL = f"http://127.0.0.1:{os.getenv('PORT', '8000')}"
 
 async def get_mcp_tools():
     """Fetches available tools from the local MCP router."""

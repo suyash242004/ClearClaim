@@ -1,0 +1,19 @@
+name: Keep Render services warm
+
+# Render free tier sleeps after 15 min idle; OKX reviewers hit cold starts.
+# Ping every 10 minutes so the x402 handshake always answers fast.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping agent gateway
+        run: curl -s -o /dev/null -w "agents %{http_code} in %{time_total}s\n" --max-time 90 https://clearclaim-g5pd.onrender.com/agent/status || true
+      - name: Ping ReadAPI
+        run: curl -s -o /dev/null -w "readapi %{http_code} in %{time_total}s\n" --max-time 90 https://clearclaim-readapi.onrender.com/api/admin/dashboard || true
+      - name: Ping WriteAPI
+        run: curl -s -o /dev/null -w "writeapi %{http_code} in %{time_total}s\n" --max-time 90 https://clearclaim-writeapi.onrender.com || true

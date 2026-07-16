@@ -29,32 +29,62 @@ router = APIRouter()
 logger = logging.getLogger("clearclaim.mcp")
 
 # ── x402 payment challenge (OKX.AI compliance) ───────────────────────────────
-# OKX's reviewer probes /mcp/invoke expecting HTTP 402 + an `accepts` array
-# (not 405). Services are listed free (0 USDT), so any payment proof — or a
-# signed 0-amount transfer — is accepted and the result returned.
-X402_USDT_XLAYER = "0x779Ded0c9e1022225f8E0630b35a9b54bE713736"   # USDT on X Layer (eip155:196)
+# Per OKX docs (web3.okx.com/onchainos/dev-docs/okxai/howtomcp): a paid A2MCP
+# endpoint returns HTTP 402 with the v2 challenge base64-encoded in the
+# PAYMENT-REQUIRED response header (that header is what the marketplace
+# validates), plus a v1-style body for older clients. A 0-amount quote is
+# unpriceable and deadlocks the payer — hence a small non-zero fee.
+import base64 as _b64mod
+
+X402_USDT_XLAYER = "0x779ded0c9e1022225f8e0630b35a9b54be713736"   # USD₮0 on X Layer (eip155:196)
 ASP_PAYTO = os.getenv("ASP_PAYTO_ADDRESS", "0x9b0ecb6731bc961614fbfb99b835ba8b429f0cd9")
+X402_PRICE_USDT = os.getenv("X402_PRICE_USDT", "0.01")            # per-call price, USDT
+X402_PRICE_UNITS = str(int(round(float(X402_PRICE_USDT) * 1_000_000)))  # decimals=6 → "10000"
+X402_DESC = "ClearClaim AI — autonomous medical insurance agent services (pay-per-call)"
 
 
-def _x402_challenge(resource_url: str, price: str = "0") -> JSONResponse:
-    """HTTP 402 challenge with the accepts array the x402 client signs against."""
+def _x402_challenge(resource_url: str) -> JSONResponse:
+    """HTTP 402 with the v2 challenge in the PAYMENT-REQUIRED header + v1 body."""
+    v2_challenge = {
+        "x402Version": 2,
+        "resource": {
+            "url": resource_url,
+            "description": X402_DESC,
+            "mimeType": "application/json",
+        },
+        "accepts": [{
+            "scheme": "exact",
+            "network": "eip155:196",
+            "asset": X402_USDT_XLAYER,
+            "amount": X402_PRICE_UNITS,
+            "payTo": ASP_PAYTO,
+            "maxTimeoutSeconds": 300,
+            "extra": {"name": "USD₮0", "version": "1"},
+        }],
+    }
+    v1_body = {
+        "x402Version": 1,
+        "error": "X-PAYMENT header is required",
+        "accepts": [{
+            "scheme": "exact",
+            "network": "eip155:196",
+            "maxAmountRequired": X402_PRICE_UNITS,
+            "resource": resource_url,
+            "description": X402_DESC,
+            "mimeType": "application/json",
+            "payTo": ASP_PAYTO,
+            "maxTimeoutSeconds": 300,
+            "asset": X402_USDT_XLAYER,
+            "extra": {"name": "USD₮0", "version": "1"},
+        }],
+    }
     return JSONResponse(
         status_code=402,
-        content={
-            "x402Version": 1,
-            "error": "X-PAYMENT header is required",
-            "accepts": [{
-                "scheme": "exact",
-                "network": "eip155:196",
-                "maxAmountRequired": price,      # all ClearClaim services are free (0)
-                "resource": resource_url,
-                "description": "ClearClaim AI — autonomous medical insurance agent services (free per-call)",
-                "mimeType": "application/json",
-                "payTo": ASP_PAYTO,
-                "maxTimeoutSeconds": 300,
-                "asset": X402_USDT_XLAYER,
-                "extra": {"name": "USDT", "version": "2"},
-            }],
+        content=v1_body,
+        headers={
+            "PAYMENT-REQUIRED": _b64mod.b64encode(
+                json.dumps(v2_challenge).encode()
+            ).decode(),
         },
     )
 
@@ -63,7 +93,7 @@ def _is_internal_call(request: Request) -> bool:
     """In-process agent-to-agent calls come from loopback; external traffic
     (Render proxy included) does not — those must complete the x402 handshake."""
     host = request.client.host if request.client else ""
-    return host in ("127.0.0.1", "::1", "localhost")
+    return host in ("127.0.0.1", "::1", "localhost") or host.startswith("::ffff:127.")
 
 # ── ASP Identity card ─────────────────────────────────────────────────────────
 # Fill AGENT_WALLET_ADDRESS in agents/.env after OKX.AI ASP registration
@@ -407,20 +437,21 @@ async def invoke_tool(request: Request, response: Response):
     # External unpaid POSTs get the 402 challenge; a request carrying an
     # X-PAYMENT proof (services are free — 0 amount) is served. In-process
     # agent-to-agent calls on loopback skip the handshake.
-    # All ClearClaim services are listed at fee=0: per OKX's A2MCP spec,
-    # "free services simply return the result" — so a well-formed unpaid POST
-    # is served directly (their fee=0 task client sends no X-PAYMENT).
-    # The GET probe above still returns the 402 challenge for x402-check.
+    # x402 pay-per-call: unpaid external POSTs receive the 402 challenge; the
+    # payer signs the 0.01 USDT quote and replays with X-PAYMENT to get the
+    # result. In-process agent-to-agent calls on loopback stay free.
     payment_header = request.headers.get("X-Payment") or request.headers.get("X-PAYMENT")
     if payment_header:
         logger.info(f"[MCP] X-Payment received for tool '{req.tool}': {payment_header[:40]}…")
-        # x402 settlement confirmation (free service — nothing to settle onchain)
-        import base64 as _b64
-        response.headers["X-PAYMENT-RESPONSE"] = _b64.b64encode(json.dumps(
+        # x402 settlement confirmation header on the replayed (paid) response
+        response.headers["X-PAYMENT-RESPONSE"] = _b64mod.b64encode(json.dumps(
             {"success": True, "network": "eip155:196", "transaction": ""}
         ).encode()).decode()
+    elif not _is_internal_call(request):
+        logger.info(f"[MCP] Unpaid external call for tool '{req.tool}' — issuing 402 challenge.")
+        return _x402_challenge(str(request.url).split("?")[0])
     else:
-        logger.info(f"[MCP] Unpaid call for free tool '{req.tool}' — serving result directly (fee=0).")
+        logger.info(f"[MCP] Internal loopback call for tool '{req.tool}' — no payment required.")
 
     # ── Route to internal agent ───────────────────────────────────────────
     import time as _time
