@@ -44,7 +44,11 @@ X402_DESC = "ClearClaim AI — autonomous medical insurance agent services (pay-
 
 
 def _x402_challenge(resource_url: str) -> JSONResponse:
-    """HTTP 402 with the v2 challenge in the PAYMENT-REQUIRED header + v1 body."""
+    """
+    Pure x402 v2 challenge. The v2 facilitator validates the base64
+    PAYMENT-REQUIRED response header; the body carries the same v2 object
+    (a v1 body here confused the facilitator into v1 mode — round-4 review).
+    """
     v2_challenge = {
         "x402Version": 2,
         "resource": {
@@ -62,25 +66,9 @@ def _x402_challenge(resource_url: str) -> JSONResponse:
             "extra": {"name": "USD₮0", "version": "1"},
         }],
     }
-    v1_body = {
-        "x402Version": 1,
-        "error": "X-PAYMENT header is required",
-        "accepts": [{
-            "scheme": "exact",
-            "network": "eip155:196",
-            "maxAmountRequired": X402_PRICE_UNITS,
-            "resource": resource_url,
-            "description": X402_DESC,
-            "mimeType": "application/json",
-            "payTo": ASP_PAYTO,
-            "maxTimeoutSeconds": 300,
-            "asset": X402_USDT_XLAYER,
-            "extra": {"name": "USD₮0", "version": "1"},
-        }],
-    }
     return JSONResponse(
         status_code=402,
-        content=v1_body,
+        content=v2_challenge,
         headers={
             "PAYMENT-REQUIRED": _b64mod.b64encode(
                 json.dumps(v2_challenge).encode()
@@ -437,18 +425,24 @@ async def invoke_tool(request: Request, response: Response):
     # External unpaid POSTs get the 402 challenge; a request carrying an
     # X-PAYMENT proof (services are free — 0 amount) is served. In-process
     # agent-to-agent calls on loopback skip the handshake.
-    # x402 pay-per-call: unpaid external POSTs receive the 402 challenge; the
-    # payer signs the 0.01 USDT quote and replays with X-PAYMENT to get the
-    # result. In-process agent-to-agent calls on loopback stay free.
-    payment_header = request.headers.get("X-Payment") or request.headers.get("X-PAYMENT")
+    # x402 v2 pay-per-call: the OKX facilitator signs the quote and replays
+    # with the authorization in the PAYMENT-SIGNATURE header (v2 name — NOT
+    # X-PAYMENT, which is legacy v1; we accept both). The paid response must
+    # carry a base64 PAYMENT-RESPONSE header. Loopback agent calls stay free.
+    payment_header = (
+        request.headers.get("PAYMENT-SIGNATURE")
+        or request.headers.get("Payment-Signature")
+        or request.headers.get("X-Payment")
+    )
     if payment_header:
-        logger.info(f"[MCP] X-Payment received for tool '{req.tool}': {payment_header[:40]}…")
-        # x402 settlement confirmation header on the replayed (paid) response
-        response.headers["X-PAYMENT-RESPONSE"] = _b64mod.b64encode(json.dumps(
-            {"success": True, "network": "eip155:196", "transaction": ""}
+        logger.info(f"[MCP] Payment authorization received for tool '{req.tool}': {payment_header[:40]}…")
+        settlement = _b64mod.b64encode(json.dumps(
+            {"success": True, "scheme": "exact", "network": "eip155:196", "transaction": ""}
         ).encode()).decode()
+        response.headers["PAYMENT-RESPONSE"] = settlement       # v2 name
+        response.headers["X-PAYMENT-RESPONSE"] = settlement     # v1 compat
     elif not _is_internal_call(request):
-        logger.info(f"[MCP] Unpaid external call for tool '{req.tool}' — issuing 402 challenge.")
+        logger.info(f"[MCP] Unpaid external call for tool '{req.tool}' — issuing v2 402 challenge.")
         return _x402_challenge(str(request.url).split("?")[0])
     else:
         logger.info(f"[MCP] Internal loopback call for tool '{req.tool}' — no payment required.")
