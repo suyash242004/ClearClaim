@@ -29,6 +29,8 @@ Traditional health insurance is reactive and adversarial. Claims take days, deci
 
 ## The Solution
 
+![System Architecture](docs/assets/architecture.png)
+
 ClearClaim AI flips the model. Eleven autonomous agents process claims in seconds, cite the exact IRDAI clause behind every decision, predict health risks before they become claims, and write every verdict to the X Layer blockchain. A human is pulled in **only** when the AI isn't sure — and the workflow resumes from the exact step it paused on, even after a crash.
 
 ```
