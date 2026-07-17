@@ -95,10 +95,27 @@ def _start_scheduler():
             except Exception as e:
                 logger.error(f"[Scheduler] Nightly scan failed: {e}")
 
+        async def keep_warm_self_ping():
+            """Render free tier sleeps after 15 min without INBOUND traffic; a
+            request through our own public URL counts as inbound. More reliable
+            than GitHub Actions cron, which can lag past the sleep threshold
+            (OKX round-5 review hit a ~33s cold start on the first probe)."""
+            public_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+            if not public_url:
+                return
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    res = await client.get(f"{public_url}/agent/status")
+                    logger.info(f"[Scheduler] Keep-warm self-ping: {res.status_code}")
+            except Exception as e:
+                logger.warning(f"[Scheduler] Keep-warm self-ping failed: {e}")
+
         # Run auto-claim processing every 30 minutes
         scheduler.add_job(auto_process_claims, "interval", minutes=30, id="auto_process_claims")
         # Run every night at 02:00 AM
         scheduler.add_job(nightly_risk_scan, "cron", hour=2, minute=0, id="nightly_risk_scan")
+        # Keep the Render instance warm (no-op outside Render)
+        scheduler.add_job(keep_warm_self_ping, "interval", minutes=10, id="keep_warm_self_ping")
         scheduler.start()
         logger.info(
             "[Scheduler] APScheduler started — auto-process claims every 30 mins, nightly risk scan at 02:00 AM"
@@ -116,11 +133,24 @@ def _start_scheduler():
 # ── App lifecycle ─────────────────────────────────────────────────────────────
 _scheduler = None
 
+def _prewarm_rag():
+    """Embeds the RAG knowledge base once at boot (background thread) so the
+    first paid recommend_policy call doesn't pay the embedding cost. Embeds
+    are hard-bounded in shared/rag.py, so this can never wedge startup."""
+    try:
+        from shared.rag import init_knowledge_base
+        init_knowledge_base()
+    except Exception as e:
+        logger.warning(f"[Startup] RAG pre-warm skipped: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _scheduler
     logger.info("ClearClaim AI Gateway starting up — 11 agents online")
     _scheduler = _start_scheduler()
+    import threading
+    threading.Thread(target=_prewarm_rag, daemon=True, name="rag-prewarm").start()
     yield
     if _scheduler:
         _scheduler.shutdown()

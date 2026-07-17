@@ -1,10 +1,12 @@
 name: Keep Render services warm
 
 # Render free tier sleeps after 15 min idle; OKX reviewers hit cold starts.
-# Ping every 10 minutes so the x402 handshake always answers fast.
+# Every 5 minutes (GitHub cron can lag several minutes — */10 let the service
+# fall asleep between delayed runs). The gateway also self-pings every 10 min
+# via APScheduler (see agents/main.py), so this is the second line of defence.
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -13,6 +15,8 @@ jobs:
     steps:
       - name: Ping agent gateway
         run: curl -s -o /dev/null -w "agents %{http_code} in %{time_total}s\n" --max-time 90 https://clearclaim-g5pd.onrender.com/agent/status || true
+      - name: Ping MCP manifest
+        run: curl -s -o /dev/null -w "mcp-tools %{http_code} in %{time_total}s\n" --max-time 90 https://clearclaim-g5pd.onrender.com/mcp/tools || true
       - name: Ping ReadAPI
         run: curl -s -o /dev/null -w "readapi %{http_code} in %{time_total}s\n" --max-time 90 https://clearclaim-readapi.onrender.com/api/admin/dashboard || true
       - name: Ping WriteAPI

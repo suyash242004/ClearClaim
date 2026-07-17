@@ -16,6 +16,7 @@ Reference: https://www.okx.ai/tutorial/asp
 import os
 import sys
 import json
+import asyncio
 import logging
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -41,6 +42,10 @@ ASP_PAYTO = os.getenv("ASP_PAYTO_ADDRESS", "0x9b0ecb6731bc961614fbfb99b835ba8b42
 X402_PRICE_USDT = os.getenv("X402_PRICE_USDT", "0.01")            # per-call price, USDT
 X402_PRICE_UNITS = str(int(round(float(X402_PRICE_USDT) * 1_000_000)))  # decimals=6 → "10000"
 X402_DESC = "ClearClaim AI — autonomous medical insurance agent services (pay-per-call)"
+
+# Hard per-invocation budget — must stay comfortably under the advertised
+# x402 maxTimeoutSeconds (300) so a paid replay always gets an HTTP response.
+MCP_TOOL_BUDGET_S = int(os.getenv("MCP_TOOL_BUDGET_S", "240"))
 
 
 def _x402_challenge(resource_url: str) -> JSONResponse:
@@ -284,19 +289,26 @@ TOOLS = [
         "name": "recommend_policy",
         "displayName": "AI Policy Advisor",
         "description": (
-            "Recommends the optimal insurance plan using Gemini 3.5 Flash. "
-            "Inputs: customer age, family size, budget, and medical history. "
-            "Returns the best-fit plan with detailed reasoning and confidence score."
+            "Recommends the optimal insurance plan for a customer profile. "
+            "Params: age (integer years), family_size (integer members), budget "
+            "(integer, MAX ANNUAL premium in INR — the alias 'annual_budget' is also "
+            "accepted), medical_history ('No' or condition list), city. "
+            "Missing optional fields get sensible defaults server-side. "
+            "Always returns a concrete plan recommendation with reasoning and confidence score."
         ),
         "category": "Finance Copilot",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "age":             {"type": "integer", "minimum": 1, "maximum": 120},
-                "family_size":     {"type": "integer", "minimum": 1, "maximum": 20},
-                "budget":          {"type": "integer", "description": "Max annual premium in INR"},
-                "medical_history": {"type": "string", "description": "Pre-existing conditions or 'No'"},
-                "city":            {"type": "string"},
+                "age":             {"type": "integer", "minimum": 1, "maximum": 120,
+                                    "description": "Customer age in years"},
+                "family_size":     {"type": "integer", "minimum": 1, "maximum": 20, "default": 1,
+                                    "description": "Number of family members to cover"},
+                "budget":          {"type": "integer",
+                                    "description": "Max ANNUAL premium in INR (alias accepted: annual_budget)"},
+                "medical_history": {"type": "string", "default": "No",
+                                    "description": "Pre-existing conditions or 'No'"},
+                "city":            {"type": "string", "description": "Customer city (optional)"},
             },
             "required": ["age", "family_size", "budget", "medical_history", "city"],
         },
@@ -376,6 +388,47 @@ async def invoke_probe(request: Request):
     return _x402_challenge(str(request.url).split("?")[0])
 
 
+def _extract_call(body: dict) -> tuple:
+    """
+    Pulls (tool_name, params) out of any request shape OKX buyer tooling has
+    been seen to send (round-5 review: a valid tool+params body still got the
+    manifest help message back):
+      {"tool": X, "params": {...}}                      — our documented shape
+      {"name"|"service"|"toolName"|"tool_name": X, ...} — loose variants
+      {"jsonrpc": "2.0", "method": "tools/call",
+       "params": {"name": X, "arguments": {...}}}       — MCP JSON-RPC
+      params under: params / arguments / args / input / inputs / parameters
+    """
+    tool_name = (body.get("tool") or body.get("name") or body.get("service")
+                 or body.get("toolName") or body.get("tool_name"))
+    params = None
+    for key in ("params", "arguments", "args", "input", "inputs", "parameters"):
+        if isinstance(body.get(key), dict):
+            params = body[key]
+            break
+
+    # MCP JSON-RPC: method "tools/call" carries the real name inside params
+    method = body.get("method")
+    if isinstance(method, str):
+        rpc_params = body.get("params") if isinstance(body.get("params"), dict) else {}
+        if method in ("tools/call", "call_tool", "invoke"):
+            tool_name = tool_name or rpc_params.get("name") or rpc_params.get("tool")
+            inner = rpc_params.get("arguments") or rpc_params.get("params")
+            if isinstance(inner, dict):
+                params = inner
+        elif not tool_name and any(t["name"] == method for t in TOOLS):
+            tool_name = method
+
+    # Tool name sent as nested object {"tool": {"name": X, "arguments": {...}}}
+    if isinstance(tool_name, dict):
+        inner = tool_name.get("arguments") or tool_name.get("params")
+        if isinstance(inner, dict) and params is None:
+            params = inner
+        tool_name = tool_name.get("name") or tool_name.get("tool")
+
+    return (str(tool_name) if tool_name else None), (params or {})
+
+
 class InvokeRequest(BaseModel):
     tool: str
     params: Optional[Dict[str, Any]] = {}
@@ -396,17 +449,18 @@ async def invoke_tool(request: Request, response: Response):
     if not isinstance(body, dict):
         body = {}
 
-    tool_name = body.get("tool") or body.get("name") or body.get("service")
+    tool_name, params = _extract_call(body)
     if not tool_name:
         # x402 free-task replay with an arbitrary payload — return a real,
         # useful result payload (never an error) so the task can complete.
         text = json.dumps(body)[:500].lower()
         if "fraud" in text or "risk" in text:
-            tool_name, body = "score_fraud", {"params": {"claim_id": body.get("claim_id", 39)}}
+            tool_name, params = "score_fraud", {"claim_id": body.get("claim_id", 39)}
         elif "plan" in text or "policy" in text or "recommend" in text or "insurance" in text:
-            tool_name = "recommend_policy"
-            body = {"params": {"age": 30, "family_size": 2, "budget": 30000,
-                               "medical_history": "No", "city": "Mumbai"}}
+            # Route to the advisor but keep the buyer's own fields (age,
+            # annual_budget, …) — the request model normalises aliases and
+            # fills documented defaults.
+            tool_name, params = "recommend_policy", dict(body)
         else:
             return {
                 "service": AGENT_NAME,
@@ -419,7 +473,7 @@ async def invoke_tool(request: Request, response: Response):
                 },
             }
 
-    req = InvokeRequest(tool=str(tool_name), params=body.get("params") or {})
+    req = InvokeRequest(tool=str(tool_name), params=params or {})
 
     # ── Payment verification (x402) ───────────────────────────────────────
     # External unpaid POSTs get the 402 challenge; a request carrying an
@@ -468,7 +522,7 @@ async def invoke_tool(request: Request, response: Response):
             success=success,
         )
 
-    try:
+    async def _run_tool():
         if req.tool == "process_claims":
             from claim_processor.router import process_pending_claims
             result = await process_pending_claims()
@@ -602,6 +656,23 @@ async def invoke_tool(request: Request, response: Response):
                         f"{', '.join(t['name'] for t in TOOLS)}"),
             )
 
+    # ── Watchdog: the x402 replay allows maxTimeoutSeconds=300; answer well
+    # inside it no matter which downstream dependency stalls (round-5 review:
+    # 4/4 recommend_policy replays died as connection timeouts).
+    try:
+        return await asyncio.wait_for(_run_tool(), timeout=MCP_TOOL_BUDGET_S)
+    except asyncio.TimeoutError:
+        logger.error(f"[MCP] Tool '{req.tool}' hit the {MCP_TOOL_BUDGET_S}s watchdog")
+        _book(success=False)
+        return {
+            "tool": req.tool,
+            "result": {
+                "status": "degraded",
+                "message": (f"'{req.tool}' could not finish within {MCP_TOOL_BUDGET_S}s. "
+                            "No charge is due for this call — please retry; "
+                            "the service self-recovers."),
+            },
+        }
     except HTTPException:
         raise
     except Exception as e:

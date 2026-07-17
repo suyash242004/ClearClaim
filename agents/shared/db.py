@@ -17,10 +17,13 @@ from shared.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 
 
 def get_db_connection():
-    """Returns a new connection to the PostgreSQL database."""
+    """Returns a new connection to the PostgreSQL database.
+    connect_timeout bounds an unreachable DB at 8s instead of the OS TCP
+    timeout (~2 min), which would blow the x402 response window."""
     return psycopg2.connect(
         host=DB_HOST, port=DB_PORT,
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD
+        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD,
+        connect_timeout=8,
     )
 
 

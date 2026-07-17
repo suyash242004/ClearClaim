@@ -5,14 +5,40 @@ agents/shared/gemini_client.py — Gemini API client with:
   - Explicit quota / API-key error detection with clear logs
   - Fallback "flag" response so agents never crash
 """
+import os
 import re
 import json
 import time
 import logging
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FutureTimeout
 import google.generativeai as genai
 from shared.config import GEMINI_API_KEYS, MODEL_NAME, FALLBACK_MODEL_NAME
 
 logger = logging.getLogger("clearclaim.gemini")
+
+# Hard wall-clock budget per Gemini API attempt. The gRPC transport retries
+# 503 UNAVAILABLE internally for up to 600s, which made a single
+# generate_content() hang far past the 300s x402 maxTimeoutSeconds window
+# (OKX review round 5: 4/4 recommend_policy replays timed out). REST transport
+# + an outer thread deadline makes the bound unconditional.
+GEMINI_TIMEOUT_S = int(os.getenv("GEMINI_TIMEOUT_S", "25"))
+
+# Daemon pool: a deadline-abandoned call leaves its thread behind; keep enough
+# workers that a few stragglers can't starve fresh requests.
+_executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="gemini")
+
+
+def call_with_deadline(fn, timeout_s: float = GEMINI_TIMEOUT_S):
+    """Runs fn() in a worker thread and gives up after timeout_s seconds,
+    no matter what the SDK's own retry/deadline machinery does."""
+    future = _executor.submit(fn)
+    try:
+        return future.result(timeout=timeout_s)
+    except _FutureTimeout:
+        future.cancel()
+        # NB: wording must not contain "exceeded" — _is_quota_error keys on it
+        raise TimeoutError(f"Gemini call timed out after {timeout_s}s deadline")
+
 
 _current_key_idx = 0
 _active_model_name = MODEL_NAME
@@ -21,7 +47,9 @@ model = None
 def _init_model():
     global model
     if GEMINI_API_KEYS and _current_key_idx < len(GEMINI_API_KEYS):
-        genai.configure(api_key=GEMINI_API_KEYS[_current_key_idx])
+        # REST transport: gRPC channels have been observed to ignore
+        # request_options timeouts and hang; REST honours them.
+        genai.configure(api_key=GEMINI_API_KEYS[_current_key_idx], transport="rest")
         model = genai.GenerativeModel(_active_model_name)
     else:
         logger.warning("[GeminiClient] No GEMINI_API_KEYS available — all AI calls will fallback.")
@@ -31,8 +59,14 @@ _init_model()
 
 
 def _is_model_error(err: Exception) -> bool:
+    """Model can't serve right now → try the fallback model instead of
+    retrying the same one. Includes 503 UNAVAILABLE / 'high demand': as of
+    Jul 2026 gemini-3.5-flash 503s consistently while gemini-2.5-flash works."""
     msg = str(err).lower()
-    return "not found" in msg or "404" in msg or "is not supported" in msg
+    return any(k in msg for k in [
+        "not found", "404", "is not supported",
+        "503", "unavailable", "high demand", "overloaded", "deadline",
+    ])
 
 
 def _downgrade_model() -> bool:
@@ -107,7 +141,11 @@ def generate_json_response(prompt: str, max_retries: int = 2) -> dict:
     last_error = None
     for attempt in range(max_retries + 1):
         try:
-            response = model.generate_content(prompt)
+            response = call_with_deadline(
+                lambda: model.generate_content(
+                    prompt, request_options={"timeout": GEMINI_TIMEOUT_S}
+                )
+            )
             text = (response.text or "").strip()
             if not text:
                 last_error = "Empty response from Gemini"
@@ -151,7 +189,11 @@ def generate_response(prompt: str, max_retries: int = 2) -> str:
     last_error = ""
     for attempt in range(max_retries + 1):
         try:
-            response = model.generate_content(prompt)
+            response = call_with_deadline(
+                lambda: model.generate_content(
+                    prompt, request_options={"timeout": GEMINI_TIMEOUT_S}
+                )
+            )
             return (response.text or "").strip() or "AI returned an empty response."
         except Exception as e:
             last_error = str(e)

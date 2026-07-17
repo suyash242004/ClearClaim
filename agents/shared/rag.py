@@ -2,7 +2,7 @@ import numpy as np
 import google.generativeai as genai
 import time
 from shared.config import GEMINI_API_KEYS
-from shared.gemini_client import _rotate_api_key, _is_quota_error, logger
+from shared.gemini_client import _rotate_api_key, _is_quota_error, logger, call_with_deadline
 
 # We don't configure genai directly here because gemini_client configures it globally
 # and handles rotation.
@@ -27,17 +27,25 @@ KNOWLEDGE_BASE = [
 _DOCUMENT_EMBEDDINGS = None
 
 def _safe_embed(model_name: str, content, task_type: str) -> dict:
-    for attempt in range(3):
+    # 2 attempts, each hard-bounded to 15s: RAG is best-effort context — it
+    # must never eat the caller's x402 response window (300s) if Gemini hangs.
+    for attempt in range(2):
         try:
-            return genai.embed_content(model=model_name, content=content, task_type=task_type)
+            return call_with_deadline(
+                lambda: genai.embed_content(
+                    model=model_name, content=content, task_type=task_type,
+                    request_options={"timeout": 15},
+                ),
+                timeout_s=15,
+            )
         except Exception as e:
             if _is_quota_error(e):
                 logger.error(f"[RAG] Quota exhausted: {e}")
                 if _rotate_api_key():
                     continue
             logger.warning(f"[RAG] Embed failed attempt {attempt+1}: {e}")
-            if attempt < 2:
-                time.sleep(1.5 * (attempt + 1))
+            if attempt < 1:
+                time.sleep(1.0)
                 continue
             raise
 
