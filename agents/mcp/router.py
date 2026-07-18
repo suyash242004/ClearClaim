@@ -289,14 +289,26 @@ TOOLS = [
         "name": "recommend_policy",
         "displayName": "AI Policy Advisor",
         "description": (
-            "Recommends the optimal insurance plan for a customer profile. "
-            "Params: age (integer years), family_size (integer members), budget "
-            "(integer, MAX ANNUAL premium in INR — the alias 'annual_budget' is also "
-            "accepted), medical_history ('No' or condition list), city. "
-            "Missing optional fields get sensible defaults server-side. "
-            "Always returns a concrete plan recommendation with reasoning and confidence score."
+            "Recommends the optimal insurance plan for a customer profile from an "
+            "INR-denominated Indian health-plan catalog, with output localised to the "
+            "buyer's currency (USD/EUR/GBP figures converted and disclosed). "
+            "Params: age (years), family_size (members), budget (MAX ANNUAL premium — "
+            "number or string like 'USD 9000'; alias 'annual_budget' accepted), "
+            "currency (auto-detected from budget/city if omitted), medical_history "
+            "(condition list or 'No' — reflected in the reasoning), city. "
+            "Always returns a concrete plan recommendation derived from the submitted inputs."
         ),
         "category": "Finance Copilot",
+        "invocation": {
+            "endpoint": "POST /mcp/invoke",
+            "body": {
+                "tool": "recommend_policy",
+                "params": {"age": 38, "family_size": 4, "budget": 9000,
+                           "currency": "USD",
+                           "medical_history": "mild asthma, medicated hypertension",
+                           "city": "Austin, TX, USA"},
+            },
+        },
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -304,11 +316,17 @@ TOOLS = [
                                     "description": "Customer age in years"},
                 "family_size":     {"type": "integer", "minimum": 1, "maximum": 20, "default": 1,
                                     "description": "Number of family members to cover"},
-                "budget":          {"type": "integer",
-                                    "description": "Max ANNUAL premium in INR (alias accepted: annual_budget)"},
+                "budget":          {"type": ["integer", "string"],
+                                    "description": "Max ANNUAL premium in the buyer's currency. "
+                                                   "Number or string ('9000', 'USD 9000', '$9,000/yr'). "
+                                                   "Aliases accepted: annual_budget, budget_usd"},
+                "currency":        {"type": "string", "default": "INR",
+                                    "description": "ISO code (USD/EUR/GBP/INR). Auto-detected from "
+                                                   "the budget string or city when omitted"},
                 "medical_history": {"type": "string", "default": "No",
-                                    "description": "Pre-existing conditions or 'No'"},
-                "city":            {"type": "string", "description": "Customer city (optional)"},
+                                    "description": "Pre-existing conditions or 'No' — named conditions "
+                                                   "are reflected in the recommendation reasoning"},
+                "city":            {"type": "string", "description": "Customer city/location (optional)"},
             },
             "required": ["age", "family_size", "budget", "medical_history", "city"],
         },
@@ -317,8 +335,13 @@ TOOLS = [
             "properties": {
                 "recommended_plan_id":   {"type": "integer"},
                 "recommended_plan_name": {"type": "string"},
-                "reasoning":             {"type": "string"},
+                "reasoning":             {"type": "string",
+                                          "description": "Personalised, in the buyer's currency"},
                 "confidence_score":      {"type": "number"},
+                "currency":              {"type": "string"},
+                "annual_premium":        {"type": "number", "description": "In buyer currency"},
+                "coverage_amount":       {"type": "number", "description": "In buyer currency"},
+                "notes":                 {"type": "string", "description": "FX/catalog disclosure"},
             },
         },
         "pricing": {
@@ -378,7 +401,17 @@ async def agent_identity(request: Request):
 @router.get("/mcp/tools")
 async def list_tools():
     """Returns the full tool manifest for OKX.AI discovery."""
-    return {"tools": TOOLS, "agent": AGENT_NAME, "version": AGENT_VERSION}
+    return {
+        "tools": TOOLS,
+        "agent": AGENT_NAME,
+        "version": AGENT_VERSION,
+        "usage": {
+            "endpoint": "POST /mcp/invoke",
+            "body": {"tool": "<tool_name>", "params": {"<param>": "<value>"}},
+            "note": "Each tool's exact params are in its inputSchema below; "
+                    "recommend_policy also documents a full example under 'invocation'.",
+        },
+    }
 
 
 @router.get("/mcp/invoke")
@@ -426,7 +459,34 @@ def _extract_call(body: dict) -> tuple:
             params = inner
         tool_name = tool_name.get("name") or tool_name.get("tool")
 
+    # Tool name as a top-level key: {"recommend_policy": {"age": 38, ...}}
+    if not tool_name:
+        for t in TOOLS:
+            if isinstance(body.get(t["name"]), dict):
+                tool_name = t["name"]
+                params = body[t["name"]]
+                break
+
     return (str(tool_name) if tool_name else None), (params or {})
+
+
+# Param names whose presence identifies the intended tool even when the buyer
+# sends a bare params body with no "tool" key at all (round-6 review: such a
+# body got the manifest help message instead of a recommendation).
+_POLICY_SIGNATURE_KEYS = {
+    "age", "budget", "annual_budget", "budget_usd", "annual_budget_usd",
+    "family_size", "medical_history", "conditions", "city", "yearly_budget",
+    "max_premium", "premium_budget",
+}
+
+
+def _infer_tool_from_params(body: dict) -> Optional[str]:
+    keys = {str(k).lower().strip() for k in body}
+    if "claim_id" in keys:
+        return "score_fraud"
+    if len(keys & _POLICY_SIGNATURE_KEYS) >= 2:
+        return "recommend_policy"
+    return None
 
 
 class InvokeRequest(BaseModel):
@@ -451,23 +511,38 @@ async def invoke_tool(request: Request, response: Response):
 
     tool_name, params = _extract_call(body)
     if not tool_name:
+        # Bare params body ({"age": 38, "annual_budget": 9000, ...}) — the
+        # param signature identifies the tool; keep the buyer's own fields.
+        inferred = _infer_tool_from_params(body)
+        if inferred:
+            tool_name, params = inferred, dict(body)
+
+    if not tool_name:
         # x402 free-task replay with an arbitrary payload — return a real,
         # useful result payload (never an error) so the task can complete.
         text = json.dumps(body)[:500].lower()
         if "fraud" in text or "risk" in text:
             tool_name, params = "score_fraud", {"claim_id": body.get("claim_id", 39)}
         elif "plan" in text or "policy" in text or "recommend" in text or "insurance" in text:
-            # Route to the advisor but keep the buyer's own fields (age,
-            # annual_budget, …) — the request model normalises aliases and
-            # fills documented defaults.
             tool_name, params = "recommend_policy", dict(body)
         else:
             return {
                 "service": AGENT_NAME,
                 "agent_id": "5967",
                 "result": {
-                    "message": "ClearClaim AI is online. Free services — call with "
-                               '{"tool": "<name>", "params": {...}}.',
+                    "message": "ClearClaim AI is online. Call a tool with the body shape "
+                               "shown in `usage`; full schemas at /mcp/tools.",
+                    "usage": {
+                        "endpoint": "POST /mcp/invoke",
+                        "body": {"tool": "<tool_name>", "params": {"<param>": "<value>"}},
+                        "example": {
+                            "tool": "recommend_policy",
+                            "params": {"age": 38, "family_size": 4, "budget": 9000,
+                                       "currency": "USD",
+                                       "medical_history": "asthma, hypertension",
+                                       "city": "Austin, TX, USA"},
+                        },
+                    },
                     "available_tools": [t["name"] for t in TOOLS],
                     "manifest": "/mcp/tools",
                 },
