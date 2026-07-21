@@ -142,26 +142,65 @@ TOOLS = [
         "description": (
             "Instantly calculates a fraud risk score (0–100) for any claim "
             "using algorithmic rules: disease-history mismatch, coverage utilisation, "
-            "temporal patterns, and claim amount thresholds."
+            "temporal patterns, and claim amount thresholds. "
+            "Two input modes — provide EITHER claim_id (looks up a claim in our own "
+            "database) OR a full payload (for external buyers with their own claim data, "
+            "e.g. disease + claim_amount + coverage_amount). Payload mode is stateless: "
+            "it never reads or writes our database."
         ),
         "category": "Finance Copilot",
+        "invocation": {
+            "endpoint": "POST /mcp/invoke",
+            "mode_a_claim_id": {"tool": "score_fraud", "params": {"claim_id": 35}},
+            "mode_b_payload": {
+                "tool": "score_fraud",
+                "params": {
+                    "disease": "Cardiac Surgery", "claim_amount": 450000, "coverage_amount": 500000,
+                    "previously_approved_total": 0, "days_since_policy_start": 12,
+                    "historical_disease": "None", "prior_claim_count": 0, "hospital_in_network": True,
+                },
+            },
+        },
         "inputSchema": {
             "type": "object",
             "properties": {
                 "claim_id": {
                     "type": "integer",
-                    "description": "The numeric ID of the claim to score.",
+                    "description": "Mode A — the numeric ID of a claim in OUR database. "
+                                   "Omit this to use Mode B (payload) instead.",
                 },
+                "disease": {"type": "string",
+                           "description": "Mode B, required. Diagnosed condition/procedure."},
+                "claim_amount": {"type": "number",
+                                 "description": "Mode B, required. Claimed amount (same currency as coverage_amount)."},
+                "coverage_amount": {"type": "number",
+                                    "description": "Mode B, required. Total sum insured on the policy."},
+                "previously_approved_total": {"type": "number", "default": 0,
+                                              "description": "Mode B, optional. Sum of previously approved claims on this policy."},
+                "days_since_policy_start": {"type": "integer", "default": 999,
+                                            "description": "Mode B, optional. Days between policy start and this claim."},
+                "historical_disease": {"type": "string", "default": "None",
+                                       "description": "Mode B, optional. Customer's declared pre-existing condition(s)."},
+                "prior_claim_count": {"type": "integer", "default": 0,
+                                      "description": "Mode B, optional. Number of prior claims on this policy."},
+                "hospital_in_network": {"type": "boolean", "default": True,
+                                        "description": "Mode B, optional. Accepted but not currently used by the "
+                                                       "fraud-scoring rules (kept for symmetry with adjudication)."},
             },
-            "required": ["claim_id"],
+            "required": [],
+            "oneOf": [
+                {"required": ["claim_id"]},
+                {"required": ["disease", "claim_amount", "coverage_amount"]},
+            ],
         },
         "outputSchema": {
             "type": "object",
             "properties": {
-                "claim_id":   {"type": "integer"},
+                "claim_id":   {"type": ["integer", "null"], "description": "null in Mode B"},
                 "score":      {"type": "integer", "minimum": 0, "maximum": 100},
                 "risk_level": {"type": "string", "enum": ["Low", "Medium", "High"]},
                 "indicators": {"type": "array", "items": {"type": "string"}},
+                "mode":       {"type": "string", "enum": ["claim_id", "payload"]},
             },
         },
         "pricing": {
@@ -172,21 +211,59 @@ TOOLS = [
     },
     {
         "name": "graph_adjudicate",
-        "displayName": "LangGraph Claim Adjudication (Checkpointed)",
+        "displayName": "Insurance Claim Adjudication (LangGraph, Checkpointed)",
         "description": (
-            "Production-grade stateful claim pipeline on LangGraph: IRDAI rules gate → "
-            "fraud score → clinical cross-check → Gemini adjudication → human checkpoint "
-            "(if low confidence / high value) → X Layer onchain record. Every step is "
-            "checkpointed to disk — a crash resumes exactly where it stopped, and the "
-            "full audit trail is replayable."
+            "Reviews a medical insurance claim start to finish — IRDAI policy rules and "
+            "waiting periods, fraud score, Gemini adjudication — and returns an "
+            "approve/reject/flag decision with reasoning, confidence, and payable amount. "
+            "Two input modes — provide EITHER claim_id (runs the full checkpointed "
+            "LangGraph pipeline against our database, with onchain recording and a human "
+            "review queue for low-confidence/high-value claims) OR a full payload (for "
+            "external buyers with their own claim data). Payload mode is stateless: no "
+            "database write, no onchain write, no human-review queue (advisory "
+            "requires_human_review flag instead)."
         ),
         "category": "Finance Copilot",
+        "invocation": {
+            "endpoint": "POST /mcp/invoke",
+            "mode_a_claim_id": {"tool": "graph_adjudicate", "params": {"claim_id": 35}},
+            "mode_b_payload": {
+                "tool": "graph_adjudicate",
+                "params": {
+                    "disease": "Cardiac Surgery", "claim_amount": 450000, "coverage_amount": 500000,
+                    "previously_approved_total": 0, "days_since_policy_start": 12,
+                    "historical_disease": "None", "prior_claim_count": 0, "hospital_in_network": True,
+                    "doctor_name": "Dr. Rao", "description": "Emergency bypass surgery",
+                    "customer_age": 54, "customer_gender": "Male",
+                },
+            },
+        },
         "inputSchema": {
             "type": "object",
             "properties": {
-                "claim_id": {"type": "integer", "description": "Claim ID to adjudicate"},
+                "claim_id": {"type": "integer", "description": "Mode A — Claim ID in OUR database. "
+                                                                "Omit this to use Mode B (payload) instead."},
+                "disease": {"type": "string",
+                           "description": "Mode B, required. Diagnosed condition/procedure."},
+                "claim_amount": {"type": "number",
+                                 "description": "Mode B, required. Claimed amount."},
+                "coverage_amount": {"type": "number",
+                                    "description": "Mode B, required. Total sum insured on the policy."},
+                "previously_approved_total": {"type": "number", "default": 0},
+                "days_since_policy_start": {"type": "integer", "default": 999},
+                "historical_disease": {"type": "string", "default": "None"},
+                "prior_claim_count": {"type": "integer", "default": 0},
+                "hospital_in_network": {"type": "boolean", "default": True},
+                "doctor_name": {"type": "string", "default": ""},
+                "description": {"type": "string", "default": ""},
+                "customer_age": {"type": "integer", "default": None},
+                "customer_gender": {"type": "string", "default": "Unknown"},
             },
-            "required": ["claim_id"],
+            "required": [],
+            "oneOf": [
+                {"required": ["claim_id"]},
+                {"required": ["disease", "claim_amount", "coverage_amount"]},
+            ],
         },
         "outputSchema": {
             "type": "object",
@@ -194,10 +271,12 @@ TOOLS = [
                 "ai_decision":    {"type": "string"},
                 "confidence":     {"type": "number"},
                 "payable_amount": {"type": "number"},
-                "fraud_score":    {"type": "integer"},
-                "tx_hash":        {"type": "string"},
-                "is_paused":      {"type": "boolean", "description": "True = awaiting human review"},
+                "fraud_score":    {"type": ["integer", "null"]},
+                "tx_hash":        {"type": ["string", "null"], "description": "null in Mode B (no onchain write)"},
+                "is_paused":      {"type": "boolean", "description": "Mode A only — true = awaiting human review"},
+                "requires_human_review": {"type": "boolean", "description": "Mode B only — advisory equivalent of is_paused"},
                 "audit_trail":    {"type": "array", "items": {"type": "string"}},
+                "mode":           {"type": "string", "enum": ["claim_id", "payload"]},
             },
         },
         "pricing": {"model": "per_call", "amount": "0.75", "currency": "USDT"},
@@ -606,12 +685,21 @@ async def invoke_tool(request: Request, response: Response):
 
         elif req.tool == "score_fraud":
             claim_id = req.params.get("claim_id")
-            if not claim_id:
-                raise HTTPException(status_code=400, detail="Missing required param: claim_id")
-            from fraud_detector.router import calculate_fraud_score
-            result = calculate_fraud_score(int(claim_id))
-            _book()
-            return {"tool": req.tool, "result": result.model_dump()}
+            if claim_id:
+                # Mode A — UNCHANGED existing behavior, byte-for-byte.
+                from fraud_detector.router import calculate_fraud_score
+                result = calculate_fraud_score(int(claim_id))
+                _book()
+                return {"tool": req.tool, "result": {**result.model_dump(), "mode": "claim_id"}}
+            # Mode B — stateless payload scoring for external buyers.
+            from fraud_detector.router import score_fraud_from_payload
+            try:
+                result = score_fraud_from_payload(req.params or {})
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            # No _book(): payload mode is stateless per spec — no DB writes at all,
+            # including the economics ledger.
+            return {"tool": req.tool, "result": result}
 
         elif req.tool == "recommend_policy":
             from policy_advisor.router import (
@@ -699,12 +787,22 @@ async def invoke_tool(request: Request, response: Response):
 
         elif req.tool == "graph_adjudicate":
             claim_id = req.params.get("claim_id")
-            if not claim_id:
-                raise HTTPException(status_code=400, detail="Missing required param: claim_id")
-            from orchestrator.graph_router import run_graph
+            if claim_id:
+                # Mode A — UNCHANGED existing behavior, byte-for-byte.
+                from orchestrator.graph_router import run_graph
+                import anyio
+                result = await anyio.to_thread.run_sync(run_graph, int(claim_id))
+                _book()
+                return {"tool": req.tool, "result": {**result, "mode": "claim_id"}}
+            # Mode B — stateless adjudication for external buyers with no claim_id.
+            from orchestrator.adjudicate_payload import adjudicate_claim_from_payload
             import anyio
-            result = await anyio.to_thread.run_sync(run_graph, int(claim_id))
-            _book()
+            try:
+                result = await anyio.to_thread.run_sync(adjudicate_claim_from_payload, req.params or {})
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            # No _book(): payload mode is stateless per spec — no DB writes at all,
+            # including the economics ledger.
             return {"tool": req.tool, "result": result}
 
         elif req.tool == "hospital_preauth":
